@@ -1,5 +1,8 @@
 (ns algebra)
 
+
+;; TODO: instead of negative?, have those rings that support it implement Comparable and compare to the additive identity.
+
 (defprotocol Ring
   (member? [this x])
   (additive-identity [this])
@@ -16,6 +19,7 @@
   (divide [this x y]))
 
 (def NativeArithmetic
+  "The 'ring' of Clojure's native arithmetic (overflow-safe) operators."
   (reify
     Ring
     (member? [this x] (number? x))

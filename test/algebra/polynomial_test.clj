@@ -165,19 +165,19 @@
       (is (= [z2 x3 x2z2 xy2z] (monomial-sort graded-reverse-lex-order)))
       (is (= [z2 x3 xy2z x2z2] (monomial-sort graded-lex-order))))))
 
-
-
-#_(deftest poly-evaluate
+(deftest poly-evaluate
   (testing "arity 1"
     (let [[k x] (basis a/NativeArithmetic 1)
-          p (add ())]
-      )
-
-    (let [p (->poly '(+ 2 (* x 3)))]
+          p (reduce add [(scale 3 x) (scale 2 k)])]
       (is (= 14 (evaluate p [4])))
       (is (= 11 (evaluate p [3 2]))))
-    (is (= 256 (evaluate (->poly '(expt x 8)) [2])))
-    (is (= 272 (evaluate (->poly '(+ (expt x 4) (expt x 8))) [2]))))
+
+
+    #_(is (= 256 (evaluate (->poly '(expt x 8)) [2])))
+    #_(is (= 272 (evaluate (->poly '(+ (expt x 4) (expt x 8))) [2])))))
+
+#_(deftest poly-evaluate
+
   (testing "arity 2"
     (let [p (->poly '(expt (+ x y) 2))]
       (is (= 25 (evaluate p [2 3])))))

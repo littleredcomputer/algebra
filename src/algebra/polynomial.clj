@@ -191,8 +191,9 @@
 
 (defn basis
   [ring arity]
-  (for [i (range arity)]
-    (->Polynomial ring arity [[(vec (for [j (range (inc arity))] (if (= i j) (a/multiplicative-identity ring) (a/additive-identity ring))))]])))
+  (cons (->Polynomial ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity ring)]])
+        (for [i (range arity)]
+          (->Polynomial ring arity [[(vec (for [j (range (inc arity))] (if (= i j) 1 0))) (a/multiplicative-identity ring)]]))))
 
 (defn add
   "Adds the polynomials p and q"
