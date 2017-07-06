@@ -73,9 +73,9 @@
   (toString [_]
     (let [n 10
           c (count xs->c)]
-      (str "( "
+      (str "("
            ring
-           " a"
+           " #"
            arity
            " "
            (string/join ";"
@@ -193,7 +193,7 @@
   [ring arity]
   (cons (->Polynomial ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity ring)]])
         (for [i (range arity)]
-          (->Polynomial ring arity [[(vec (for [j (range (inc arity))] (if (= i j) 1 0))) (a/multiplicative-identity ring)]]))))
+          (->Polynomial ring arity [[(vec (for [j (range arity)] (if (= i j) 1 0))) (a/multiplicative-identity ring)]]))))
 
 (defn add
   "Adds the polynomials p and q"
@@ -238,6 +238,24 @@
                         [xq cq] (.xs->c q)]
                     [(mapv + xp xq) (a/mul R cp cq)])))))
 
+(defn polynomial-order
+  [^Polynomial p ^Polynomial q]
+  {:pre [(instance? Polynomial p)
+         (instance? Polynomial q)
+         (= (.arity p) (.arity q))
+         (= (.ring p) (.ring q))]}
+  (loop [pterms (rseq (.xs->c p))
+         qterms (rseq (.xs->c q))]
+    (cond (nil? qterms) (if pterms 1 0)
+          (nil? pterms) -1
+          :else (let [[ep cp] (first pterms)
+                      [eq cq] (first qterms)]
+                  (let [mo (monomial-order ep eq)]
+                    (if (zero? mo)
+                      (let [k (compare cp cq)]
+                        (if (not= k 0) k (recur (next pterms) (next qterms))))
+                      mo))))))
+
 (defn PolynomialRing
   [coefficient-ring arity]
   (reify
@@ -247,7 +265,6 @@
     (additive-identity? [this p] (polynomial-zero? p))
     (multiplicative-identity [this] (->Polynomial coefficient-ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity coefficient-ring)]]))
     (multiplicative-identity? [this p] (polynomial-one? p))
-    (negative? [this p] (->> p lead-term coefficient (a/negative? coefficient-ring)))
     (add [this p q] (add p q))
     (subtract [this p q] (sub p q))
     (negate [this p] (polynomial-negate p))
@@ -256,6 +273,8 @@
                (a/member? this q))
         (scale p q)
         (mul p q)))
+    a/Ordered
+    (cmp [this p q] (polynomial-order p q))
     Object
     (toString [this] (format "%s[%dv]" coefficient-ring arity))))
 
@@ -307,8 +326,11 @@
         ;; XXX slow exponentiation below
         (let [x**e' (reduce #(a/mul R %2 %1) x**e (repeat (- e' e) x))]
           (recur (next xs->c)
-                 ;; question: should we define the order of multiplication
-                 ;; in a polynomial?
+                 ;; this delegates the scalar multiplication to the polynomial ring,
+                 ;; which I find slightly unfortunate. The ring of evaluation does
+                 ;; not have to be the same as the ring of coefficients, so we should
+                 ;; be supplied with a scalar evaluation map. But that may be overkill
+                 ;; at this point.
                  (a/add R result (a/mul R c x**e'))
                  x**e'
                  e'))
@@ -318,13 +340,12 @@
   "Evaluates a multivariate polynomial p at xs."
   [^Polynomial p xs]
   {:pre [(instance? Polynomial p)]}
-  ;; XXX shouldn't we throw if nil xs? Or do we still want to consider
-  ;; partial application of polynomials? (I bet not.)
   (cond (nil? xs) p
         (polynomial-zero? p) (a/additive-identity (.ring p))
-        (= (.arity p) 1) (evaluate-1 p (first xs))
+        (= (.arity p) 1) (do
+                           (assert (= 1 (count xs)))
+                           (evaluate-1 p (first xs)))
         :else (let [L (evaluate-1 (lower-arity p) (first xs))]
-                ;; XXX does this check still make sense?
                 (if (instance? Polynomial L)
                   (recur L (next xs))
                   L))))
@@ -403,7 +424,7 @@
 (defn abs
   [p]
   (let [R (.ring p)]
-    (if (->> p lead-term coefficient (a/negative? R))
+    (if (a/cmp R p (a/additive-identity R))
       (polynomial-negate p)
       p)))
 
@@ -445,98 +466,3 @@
   (for [i (range (.arity p))]
     (partial-derivative p i)))
 
-;; The operator-table represents the operations that can be understood
-;; from the point of view of a polynomial over a commutative ring. The
-;; functions take polynomial inputs and return polynomials.
-
-;  this stuff belongs near the simplifier library.
-;(def ^:private operator-table
-;  {'+ #(reduce g/add %&)
-;   '- (fn [arg & args]
-;        (if (some? args) (g/sub arg (reduce g/add args)) (g/negate arg)))
-;   '* #(reduce g/mul %&)
-;   'negate negate
-;   'expt g/expt
-;   'square #(mul % %)
-;   'cube #(mul % (mul % %))
-;   ;;`'g/gcd gcd
-;   })
-;
-;(def ^:private operators-known (into #{} (keys operator-table)))
-;
-;(deftype PolynomialAnalyzer []
-;  a/ICanonicalize
-;  (expression-> [this expr cont] (a/expression-> this expr cont compare))
-;  (expression-> [this expr cont v-compare]
-;    ;; Convert an expression into Flat Polynomial canonical form. The
-;    ;; expression should be an unwrapped expression, i.e., not an instance
-;    ;; of the Expression type, nor should subexpressions contain type
-;    ;; information. This kind of simplification proceeds purely
-;    ;; symbolically over the known Flat Polynomial operations; other
-;    ;; operations outside the arithmetic available in polynomials over
-;    ;; commutative rings should be factored out by an expression analyzer
-;    ;; before we get here. The result is a Polynomial object representing
-;    ;; the polynomial structure of the input over the unknowns.
-;    (let [expression-vars (sort v-compare (set/difference (x/variables-in expr) operators-known))
-;          variables (zipmap expression-vars (a/new-variables this (count expression-vars)))]
-;      (-> expr (x/walk-expression variables operator-table) (cont expression-vars))))
-;  (->expression [this p vars]
-;    ;; This is the output stage of Flat Polynomial canonical form simplification.
-;    ;; The input is a Polynomial object, and the output is an expression
-;    ;; representing the evaluation of that polynomial over the
-;    ;; indeterminates extracted from the expression at the start of this
-;    ;; process.
-;    (if (instance? Polynomial p)
-;      (let [^Polynomial p p]
-;        (reduce
-;         sym/add 0
-;         (map (fn [[xs c]]
-;                (sym/mul c
-;                         (reduce sym/mul 1 (map (fn [exponent var]
-;                                                  (sym/expt var exponent))
-;                                                xs vars))))
-;              (->> p .xs->c (sort-by exponents #(monomial-order %2 %1))))))
-;      p))
-;  (known-operation? [_ o] (operator-table o))
-;  (new-variables [_ arity] (for [a (range arity)]
-;                             (make arity [[(mapv #(if (= % a) 1 0) (range arity)) 1]]))))
-;
-;(defmethod g/add [::polynomial ::polynomial] [a b] (add a b))
-;(defmethod g/mul [::polynomial ::polynomial] [a b] (mul a b))
-;(defmethod g/sub [::polynomial ::polynomial] [a b] (sub a b))
-;(defmethod g/exact-divide [::polynomial ::polynomial] [p q] (evenly-divide p q))
-;(defmethod g/square [::polynomial] [a] (mul a a))
-;
-;(doseq [t [Long BigInt BigInteger Double Ratio]]
-;  (defmethod g/mul
-;    [t ::polynomial]
-;    [c p]
-;    (map-coefficients #(g/* c %) p))
-;  (defmethod g/mul
-;    [::polynomial t]
-;    [p c]
-;    (map-coefficients #(g/* % c) p))
-;  (defmethod g/add
-;    [t ::polynomial]
-;    [c ^Polynomial p]
-;    (add (make-constant (.arity p) c) p))
-;  (defmethod g/add
-;    [::polynomial t]
-;    [^Polynomial p c]
-;    (add p (make-constant (.arity p) c)))
-;  (defmethod g/sub
-;    [t ::polynomial]
-;    [c ^Polynomial p]
-;    (sub (make-constant (.arity p) c) p))
-;  (defmethod g/sub
-;    [::polynomial t]
-;    [^Polynomial p c]
-;    (sub p (make-constant (.arity p) c)))
-;  (defmethod g/div
-;    [::polynomial t]
-;    [p c]
-;    (map-coefficients #(g/divide % c) p)))
-;
-;(defmethod g/expt [::polynomial Integer] [b x] (expt b x))
-;(defmethod g/expt [::polynomial Long] [b x] (expt b x))
-;(defmethod g/negate [::polynomial] [a] (negate a))

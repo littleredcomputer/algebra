@@ -122,7 +122,6 @@
                   (additive-identity? [this x] (= x 0))
                   (multiplicative-identity [this] 1)
                   (multiplicative-identity? [this x] (= x 1))
-                  (negative? [this x] false)
                   (add [this x y] (mod (+ x y) p))
                   (subtract [this x y] (mod (- x y) p))
                   (negate [this x] (mod (- x) p))
@@ -153,7 +152,18 @@
               Tx16 (mul x16 T)
               [r2 _] (pseudo-remainder Tx16 CRC-16-CCITT)]
           (is (= (reduce add [x (expt x 5) (expt x 7)]) r1))
-          (is (= (reduce add (map #(expt x %) [0 4 5 6 9 11 12]))  r2))))))
+          (is (= (reduce add (map #(expt x %) [0 4 5 6 9 11 12])) r2))))))
+  (testing "polynomial order"
+    (let [Rx (PolynomialRing a/NativeArithmetic 1)]
+      (is (= 1 (a/cmp Rx (make [2 1 1]) (make [2 1]))))
+      (is (= -1 (a/cmp Rx (make [2 1]) (make [2 1 1]))))
+      (is (= -1 (a/cmp Rx (make [3 2 1]) (make [4 2 1]))))
+      (is (= 1 (a/cmp Rx (make [4 2 1]) (make [3 2 1]))))
+      (is (= 0 (a/cmp Rx (make [4 2 1]) (make [4 2 1]))))
+      (is (= -1 (a/cmp Rx (make [1 0 0 1 0 0]) (make [1 0 0 0 1 0]))))
+      (is (= 1 (a/cmp Rx (make [1 0 0 0 1 0]) (make [1 0 0 1 0 0]))))
+      (is (= 1 (a/cmp Rx (make [1 0 0 2 0 0]) (make [1 0 0 1 0 0]))))
+      (is (= -1 (a/cmp Rx (make [1 0 0 1 0 0]) (make [1 0 0 2 0 0]))))))
   (testing "monomial order"
     (let [x3 [3 0 0]
           x2z2 [2 0 2]
@@ -170,46 +180,47 @@
     (let [[k x] (basis a/NativeArithmetic 1)
           p (reduce add [(scale 3 x) (scale 2 k)])]
       (is (= 14 (evaluate p [4])))
-      (is (= 11 (evaluate p [3 2]))))
-
-
-    #_(is (= 256 (evaluate (->poly '(expt x 8)) [2])))
-    #_(is (= 272 (evaluate (->poly '(+ (expt x 4) (expt x 8))) [2])))))
-
-#_(deftest poly-evaluate
-
-  (testing "arity 2"
-    (let [p (->poly '(expt (+ x y) 2))]
-      (is (= 25 (evaluate p [2 3])))))
-  (testing "arity 3"
-    (let [p (->poly '(+ (expt x 3) (expt y 2) z 1))]
-      (is (= 19 (evaluate p [2 3 1])))))
-  (testing "arity 4"
-    (let [p (->poly '(expt (- w x y z) 2))]
-      (is (= 36 (evaluate p [10 1 2 1])))))
-  (testing "arity 5"
-    (let [p (->poly '(expt (- v w x y z) 2))]
-      (is (= 16 (evaluate p [10 1 2 1 2])))))
-  (testing "arity 10"
-    (let [p (->poly '(expt (- x0 x1 x2 x3 x4 x5 x6 x7 x8 x9) 3))]
-      (is (= 216 (evaluate p [10 1 2 1 2 -3 1 -2 -1 3])))))
-  (testing "constant polys"
-    (let [p1 (make [3])
-          p2 (make 2 [[[0 0] 5]])
-          p3 (make 3 [[[1 0 0] 1]])
-          p4 (make 3 [[[0 1 0] 1]])
-          p5 (make 3 [[[0 0 1] 1]])]
-      (is (= 3 (evaluate p1 [99])))
-      (is (= 5 (evaluate p2 [99 98])))
-      (is (= 7 (evaluate p3 [7 8 9])))
-      (is (= 8 (evaluate p4 [7 8 9])))
-      (is (= 9 (evaluate p5 [7 8 9])))))
-  (testing "partial application"
-    (let [P (->poly '(+ 1 (* 2 x) (* 3 x y) (* 4 x y z)))]
-      (is (= (->poly '(+ 3 (* 3 y) (* 4 y z))) (evaluate P [1])))
-      (is (= (->poly '(+ 9 (* 8 z))) (evaluate P [1 2])))
-      (is (= 33 (evaluate P [1 2 3])))
-      (is (= 33 (evaluate P [1 2 3 4]))))))
+      (is (thrown? Error (evaluate p [3 2]))))
+    (testing "arity 2"
+      (let [[k x y] (basis a/NativeArithmetic 2)
+            p (expt (add x y) 2)]
+        (is (= 25 (evaluate p [2 3])))
+        (is (= (make [4 4 1]) (evaluate p [2])))))
+    (testing "arity 3"
+      (let [[k x y z] (basis a/NativeArithmetic 3)
+            p (reduce add [(expt x 3) (expt y 2) z k])]
+        (is (= 19 (evaluate p [2 3 1])))))
+    (testing "arity 4"
+      (let [[k w x y z] (basis a/NativeArithmetic 4)
+            p (expt (reduce sub [w x y z]) 2)]
+        (is (= 36 (evaluate p [10 1 2 1])))))
+    (testing "arity 5"
+      (let [[k v w x z y] (basis a/NativeArithmetic 5)
+            p (expt (reduce sub [v w x y z]) 2)]
+        (is (= 16 (evaluate p [10 1 2 1 2])))))
+    (testing "arity 10"
+      (let [[k x0 x1 x2 x3 x4 x5 x6 x7 x8 x9] (basis a/NativeArithmetic 10)
+            p (expt (reduce sub [x0 x1 x2 x3 x4 x5 x6 x7 x8 x9]) 3)]
+        (is (= 216 (evaluate p [10 1 2 1 2 -3 1 -2 -1 3])))))
+    (testing "constant polynomials"
+      (let [p1 (make [3])
+            p2 (make 2 [[[0 0] 5]])
+            p3 (make 3 [[[1 0 0] 1]])
+            p4 (make 3 [[[0 1 0] 1]])
+            p5 (make 3 [[[0 0 1] 1]])]
+        (is (= 3 (evaluate p1 [99])))
+        (is (= 5 (evaluate p2 [99 98])))
+        (is (= 7 (evaluate p3 [7 8 9])))
+        (is (= 8 (evaluate p4 [7 8 9])))
+        (is (= 9 (evaluate p5 [7 8 9])))))
+    (testing "partial application"
+      (let [[k x y z] (basis a/NativeArithmetic 3)
+            p (reduce add [k (scale 2 x) (scale 3 (mul x y)) (scale 4 (reduce mul [x y z]))])]
+        (is (= (let [[k y z] (basis a/NativeArithmetic 2)]
+                 (reduce add [(scale 3 k) (scale 3 y) (scale 4 (mul y z))])) (evaluate p [1])))
+        (is (= (make [9 8]) (evaluate p [1 2])))
+        (is (= 33 (evaluate p [1 2 3])))
+        (is (thrown? Error (evaluate p [1 2 3 4])))))))
 
 (deftest poly-partial-derivatives
   (let [V (make [1 2 3 4])
@@ -272,8 +283,8 @@
                                 (= (mul p (add q r)) (add (mul p q) (mul p r))))))
 
 (defspec lower-and-raise-arity-are-inverse num-tests
-           (prop/for-all [p (gen/bind (gen/choose 2 10) generate-nonzero-poly)]
-                         (= p (raise-arity (lower-arity p)))))
+         (prop/for-all [p (gen/bind (gen/choose 2 10) generate-nonzero-poly)]
+                       (= p (raise-arity (lower-arity p)))))
 
 (defspec evaluation-homomorphism num-tests
          (gen/let [arity (gen/choose 1 6)]
@@ -282,68 +293,4 @@
                                  xs (gen/vector gen/int arity)]
                                 (= (*' (evaluate p xs) (evaluate q xs))
                                    (evaluate (mul p q) xs)))))
-
-
-;;;
-;;; The following is testing that should reappear in the sicmutils library
-;;;
-
-;(def ^:private poly-analyzer (->PolynomialAnalyzer))
-;(defn ^:private ->poly [x] (a/expression-> poly-analyzer x (fn [p _] p)))
-
-;(testing "with symbols"
-;  (is (= (make [(g/+ 'a 'c) (g/+ 'b 'd) 'c]) (add (make '[a b c]) (make '[c d])))))
-
-
-; this should stay over in the original library
-;(deftest poly-as-simplifier
-;  (testing "arity"
-;    (let [^Polynomial p (make [0 1])]
-;      (is (= 1 (.arity p)))))
-;  (testing "make-vars"
-;    (is (= (list (make [0 1])) (a/new-variables poly-analyzer 1)))
-;    (is (= [(make 3 [[[1 0 0] 1]])
-;            (make 3 [[[0 1 0] 1]])
-;            (make 3 [[[0 0 1] 1]])] (a/new-variables poly-analyzer 3))))
-;  (testing "expr"
-;    (let [exp1 (:expression (g/* (g/+ 1 'x) (g/+ -3 'x)))
-;          exp2 (:expression (g/expt (g/+ 1 'y) 5))
-;          exp3 (:expression (g/- (g/expt (g/- 1 'y) 6) (g/expt (g/+ 'y 1) 5)))
-;          receive (fn [a b] [a b])]
-;      (is (= '#{* + x} (variables-in exp1)))
-;      (is (= [(make [-3 -2 1]) '(x)] (a/expression-> poly-analyzer exp1 receive)))
-;      (is (= [(make [-3 -2 1]) '(x)] (a/expression-> poly-analyzer exp1 receive)))
-;      (is (= [(make [1 5 10 10 5 1]) '(y)] (a/expression-> poly-analyzer exp2 receive)))
-;      (is (= [(make [0 -11 5 -30 10 -7 1]) '(y)] (a/expression-> poly-analyzer exp3 receive)))))
-;  (testing "monomial order"
-;    (let [poly-simp #(a/expression-> poly-analyzer (:expression %) (fn [p vars] (a/->expression poly-analyzer p vars)))]
-;      (is (= '(+ (expt x 2) x 1) (poly-simp (g/+ 'x (g/expt 'x 2) 1))))
-;      (is (= '(+ (expt x 4) (* 4 (expt x 3)) (* 6 (expt x 2)) (* 4 x) 1) (poly-simp (g/expt (g/+ 1 'x) 4))))
-;      (is (= '(+
-;               (expt x 4)
-;               (* 4 (expt x 3) y)
-;               (* 6 (expt x 2) (expt y 2))
-;               (* 4 x (expt y 3))
-;               (expt y 4))
-;             (poly-simp (g/expt (g/+ 'x 'y) 4))))
-;      (is (= '(+
-;               (expt x 4)
-;               (* 4 (expt x 3) y)
-;               (* 6 (expt x 2) (expt y 2))
-;               (* 4 x (expt y 3))
-;               (expt y 4))
-;             (poly-simp (g/expt (g/+ 'y 'x) 4))))))
-;  (testing "expr-simplify"
-;    (let [poly-simp #(a/expression-> poly-analyzer % (fn [p vars] (a/->expression poly-analyzer p vars)))
-;          exp1 (:expression (g/+ (g/* 'x 'x 'x) (g/* 'x 'x) (g/* 'x 'x)))
-;          exp2 (:expression (g/+ (g/* 'y 'y) (g/* 'x 'x 'x) (g/* 'x 'x) (g/* 'x 'x) (g/* 'y 'y)))
-;          exp3 'y]
-;      (is (= '(+ (expt x 3) (* 2 (expt x 2))) (poly-simp exp1)))
-;      (is (= '(+ (expt x 3) (* 2 (expt x 2)) (* 2 (expt y 2))) (poly-simp exp2)))
-;      (is (= 'y (poly-simp exp3)))
-;      (is (= '(+ g1 g2) (poly-simp (:expression (g/+ 'g1 'g2)))))
-;      (is (= '(* 2 g1) (poly-simp (:expression (g/+ 'g1 'g1)))))
-;      (is (= 3 (poly-simp '(+ 2 1))))
-;      (is (= '(+ b (* -1 f)) (poly-simp '(- (+ a b c) (+ a c f)))))
-;      (is (= '(+ (* -1 b) f) (poly-simp '(- (+ a c f) (+ c b a))))))))
 
