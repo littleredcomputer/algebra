@@ -61,8 +61,6 @@
 ;; Polynomials
 ;;
 
-(declare evaluate)
-
 (deftype Polynomial [ring arity xs->c]
   Object
   (equals [_ b]
@@ -337,7 +335,13 @@
         result))))
 
 (defn evaluate
-  "Evaluates a multivariate polynomial p at xs."
+  "Evaluates a multivariate polynomial p at xs. Note this algorithm is
+  expensive for multivariate polynomials: for each variable, we first
+  construct a univariate polynomial with coefficients drawn from polynomials
+  over the remaining variables and apply that to the first of the values
+  given. We now have a polynomial of one lower degree, and we repeat until
+  all the input data are consumed. This form of evaluation makes more sense
+  if you want to use the partial application capability."
   [^Polynomial p xs]
   {:pre [(instance? Polynomial p)]}
   (cond (nil? xs) p
@@ -358,7 +362,7 @@
   {:pre [(instance? Polynomial u)
          (instance? Polynomial v)]}
   (cond (polynomial-zero? v) (throw (IllegalArgumentException. "internal polynomial division by zero"))
-        (polynomial-zero? u) [u u]
+        (polynomial-zero? u) [(polynomial-zero-like u) u]
         (polynomial-one? v) [u (polynomial-zero-like u)]
         :else (let [ctor (compatible-constructor u v)
                     R (.ring u)
@@ -446,7 +450,6 @@
                                 (recur x (dec c) (mul x a)))))))
 
 
-
 (defn partial-derivative
   "The partial derivative of the polynomial with respect to the
   i-th indeterminate."
@@ -466,3 +469,6 @@
   (for [i (range (.arity p))]
     (partial-derivative p i)))
 
+(defn sparse-horner-normal-form
+  [^Polynomial p]
+  `(~'+ ~@(.xs->c p)))

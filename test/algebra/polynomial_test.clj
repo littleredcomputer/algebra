@@ -12,9 +12,6 @@
            (algebra Ring Field)))
 
 (deftest poly-core
-  ; need to rethink this in light of the library separation
-  ;(testing "kind"
-  ;  (is (= :sicmutils.polynomial/polynomial (v/kind (make [])))))
   (testing "zero"
     (is (polynomial-zero? (make [])))
     (is (polynomial-zero? (make [0])))
@@ -232,6 +229,10 @@
     (is (= [(make 2 [[[0 1] 3] [[1 2] 8] [[3 0] -8]])
             (make 2 [[[1 0] 3] [[2 1] 8] [[0 2] 21]])]
            (partial-derivatives U)))))
+
+#_(deftest sparse-evaluation
+  (let [V (make [1 2 3 4])]
+    (is (= 'foo (sparse-horner-normal-form V)))))
 
 (defn generate-poly
   [arity]
