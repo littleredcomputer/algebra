@@ -230,9 +230,6 @@
             (make 2 [[[1 0] 3] [[2 1] 8] [[0 2] 21]])]
            (partial-derivatives U)))))
 
-#_(deftest sparse-evaluation
-  (let [V (make [1 2 3 4])]
-    (is (= 'foo (sparse-horner-normal-form V)))))
 
 (defn generate-poly
   [arity]

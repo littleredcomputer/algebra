@@ -1,14 +1,14 @@
 ;; Copyright Copyright © 2017 Colin Smith. MIT License.
 
 (ns algebra.polynomial
-  (:import (clojure.lang BigInt Ratio)
-    #_(algebra Ring)
-           )
+  (:import (clojure.lang BigInt Ratio))
   (:require [algebra :as a]
             [clojure.set :as set]
             [clojure.string :as string]))
 
 (declare operator-table operators-known make-constant)
+
+
 (def coefficient second)
 (def exponents first)
 
@@ -61,35 +61,35 @@
 ;; Polynomials
 ;;
 
-(deftype Polynomial [ring arity xs->c]
+(deftype Polynomial [ring arity terms]
   Object
   (equals [_ b]
     (and (instance? Polynomial b)
          (let [^Polynomial bp b]
            (and (= arity (.arity bp))
-                (= xs->c (.xs->c bp))))))
+                (= terms (.terms bp))))))
   (toString [_]
     (let [n 10
-          c (count xs->c)]
+          c (count terms)]
       (str "("
            ring
            " #"
            arity
            " "
            (string/join ";"
-                        (take n (for [[k v] xs->c]
+                        (take n (for [[k v] terms]
                                   (str v "*" (clojure.string/join "," k)))))
            (if (> c n) (format " ...and %d more terms" (- c n)))
            ")"))))
 
-(defn polynomial-zero? [^Polynomial p] (empty? (.xs->c p)))
+(defn polynomial-zero? [^Polynomial p] (empty? (.terms p)))
 (defn polynomial-one?
   "True if p has only a constant term which is equal to the multiplicative identity in its base ring"
   [^Polynomial p]
   (let [R (.ring p)
-        xs->c (.xs->c p)]
-    (when (= (count (.xs->c p)) 1)
-      (let [[xs c] (first (.xs->c p))]
+        xs->c (.terms p)]
+    (when (= (count (.terms p)) 1)
+      (let [[xs c] (first (.terms p))]
         (and (every? zero? xs)
              (a/multiplicative-identity? R c))))))
 (defn polynomial-zero-like [^Polynomial p] (->Polynomial (.ring p) (.arity p) empty-coefficients))
@@ -129,20 +129,16 @@
   "Return the leading (i.e., highest degree) term of the polynomial
   p. The return value is [exponents coefficient]."
   [^Polynomial p]
-  (-> p .xs->c peek))
+  (-> p .terms peek))
 
 (defn degree
   [p]
   (if (polynomial-zero? p) -1
                            (->> p lead-term exponents (reduce +))))
 
-(defn monomial?
-  [^Polynomial p]
-  (-> p .xs->c count (= 1)))
-
 (defn coefficients
   [^Polynomial p]
-  (->> p .xs->c (map coefficient)))
+  (->> p .terms (map coefficient)))
 
 (defn compatible-arity
   [^Polynomial p ^Polynomial q]
@@ -161,7 +157,7 @@
   [f ^Polynomial p]
   (let [R (.ring p)]
     (Polynomial. R (.arity p) (into empty-coefficients
-                                    (for [[xs c] (.xs->c p)
+                                    (for [[xs c] (.terms p)
                                           :let [fc (f c)]
                                           :when (not (a/additive-identity? R fc))]
                                       [xs fc])))))
@@ -170,7 +166,7 @@
   "Map the function f over the exponents of each monomial in p,
   returning a new Polynomial."
   [f ^Polynomial p]
-  (make (.ring p) (.arity p) (for [[xs c] (.xs->c p)]
+  (make (.ring p) (.arity p) (for [[xs c] (.terms p)]
                                [(f xs) c])))
 
 (defn polynomial-negate
@@ -200,7 +196,7 @@
          (instance? Polynomial q)]}
   (cond (polynomial-zero? p) q
         (polynomial-zero? q) p
-        :else ((compatible-constructor p q) (concat (.xs->c p) (.xs->c q)))))
+        :else ((compatible-constructor p q) (concat (.terms p) (.terms q)))))
 
 (defn sub
   "Subtract the polynomial q from the polynomial p."
@@ -211,7 +207,7 @@
         (polynomial-zero? q) p
         :else (let [R (.ring p)]
                 ((compatible-constructor p q)
-                  (concat (.xs->c p) (for [[xs c] (.xs->c q)]
+                  (concat (.terms p) (for [[xs c] (.terms q)]
                                        [xs (a/negate R c)]))))))
 
 (defn scale
@@ -232,8 +228,8 @@
         (polynomial-one? q) p
         :else (let [R (.ring p)]
                 ((compatible-constructor p q)
-                  (for [[xp cp] (.xs->c p)
-                        [xq cq] (.xs->c q)]
+                  (for [[xp cp] (.terms p)
+                        [xq cq] (.terms q)]
                     [(mapv + xp xq) (a/mul R cp cq)])))))
 
 (defn polynomial-order
@@ -242,8 +238,8 @@
          (instance? Polynomial q)
          (= (.arity p) (.arity q))
          (= (.ring p) (.ring q))]}
-  (loop [pterms (rseq (.xs->c p))
-         qterms (rseq (.xs->c q))]
+  (loop [pterms (rseq (.terms p))
+         qterms (rseq (.terms q))]
     (cond (nil? qterms) (if pterms 1 0)
           (nil? pterms) -1
           :else (let [[ep cp] (first pterms)
@@ -281,8 +277,8 @@
   [^Polynomial p]
   {:pre [(instance? Polynomial p)
          (= (.arity p) 1)]}
-  (let [terms (for [[x ^Polynomial q] (.xs->c p)
-                    [ys c] (.xs->c q)]
+  (let [terms (for [[x ^Polynomial q] (.terms p)
+                    [ys c] (.terms q)]
                 [(into x ys) c])
         ^Polynomial ltc (coefficient (lead-term p))]
     (make (.ring ltc) (inc (.arity ltc)) terms)))
@@ -304,7 +300,7 @@
   (let [R (.ring p)
         A (.arity p)]
     (->> p
-         .xs->c
+         .terms
          (group-by #(-> % exponents first))
          (map (fn [[x cs]]
                 [[x] (make (dec A) (for [[xs c] cs]
@@ -316,7 +312,7 @@
   [^Polynomial p x]
   (assert (= (.arity p) 1))
   (let [R (.ring p)]
-    (loop [xs->c (.xs->c p)
+    (loop [xs->c (.terms p)
            result (a/additive-identity R)
            x**e (a/multiplicative-identity R)
            e 0]
@@ -457,7 +453,7 @@
   (let [R (.ring p)]
     (make (.ring p)
           (.arity p)
-          (for [[xs c] (.xs->c p)
+          (for [[xs c] (.terms p)
                 :let [xi (xs i)]
                 :when (not= 0 xi)]
             [(update xs i dec) (a/mul R xi c)]))))
@@ -469,6 +465,3 @@
   (for [i (range (.arity p))]
     (partial-derivative p i)))
 
-(defn sparse-horner-normal-form
-  [^Polynomial p]
-  `(~'+ ~@(.xs->c p)))

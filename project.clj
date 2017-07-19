@@ -7,7 +7,7 @@
   :jvm-opts ["-Djava.util.logging.config.file=logging.properties"]
   :test-selectors {:default (complement :long)}
   :profiles {:test {:dependencies [[org.clojure/test.check "0.9.0"]
-                                  [criterium "0.4.4"]]}
+                                   [org.clojure/core.match "0.3.0-alpha4"]]}
 
              }
   )
