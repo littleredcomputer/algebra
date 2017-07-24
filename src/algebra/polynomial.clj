@@ -307,54 +307,11 @@
                                      [(subvec xs 1) c]))]))
          (make (PolynomialRing R (dec A)) 1))))
 
-(defn ^:private evaluate-1
-  "Evaluates a univariate polynomial p at x."
-  [^Polynomial p x]
-  (assert (= (.arity p) 1))
-  (let [R (.ring p)]
-    (loop [xs->c (.terms p)
-           result (a/additive-identity R)
-           x**e (a/multiplicative-identity R)
-           e 0]
-      (if-let [[[e'] c] (first xs->c)]
-        ;; XXX slow exponentiation below
-        (let [x**e' (reduce #(a/mul R %2 %1) x**e (repeat (- e' e) x))]
-          (recur (next xs->c)
-                 ;; this delegates the scalar multiplication to the polynomial ring,
-                 ;; which I find slightly unfortunate. The ring of evaluation does
-                 ;; not have to be the same as the ring of coefficients, so we should
-                 ;; be supplied with a scalar evaluation map. But that may be overkill
-                 ;; at this point.
-                 (a/add R result (a/mul R c x**e'))
-                 x**e'
-                 e'))
-        result))))
-
-(defn evaluate
-  "Evaluates a multivariate polynomial p at xs. Note this algorithm is
-  expensive for multivariate polynomials: for each variable, we first
-  construct a univariate polynomial with coefficients drawn from polynomials
-  over the remaining variables and apply that to the first of the values
-  given. We now have a polynomial of one lower degree, and we repeat until
-  all the input data are consumed. This form of evaluation makes more sense
-  if you want to use the partial application capability."
-  [^Polynomial p xs]
-  {:pre [(instance? Polynomial p)]}
-  (cond (nil? xs) p
-        (polynomial-zero? p) (a/additive-identity (.ring p))
-        (= (.arity p) 1) (do
-                           (assert (= 1 (count xs)))
-                           (evaluate-1 p (first xs)))
-        :else (let [L (evaluate-1 (lower-arity p) (first xs))]
-                (if (instance? Polynomial L)
-                  (recur L (next xs))
-                  L))))
-
 (defn divide
   "Divide polynomial u by v, and return the pair of [quotient, remainder]
   polynomials. This assumes that the coefficients are drawn from a field,
   and so support division."
-  [u v]
+  [^Polynomial u ^Polynomial v]
   {:pre [(instance? Polynomial u)
          (instance? Polynomial v)]}
   (cond (polynomial-zero? v) (throw (IllegalArgumentException. "internal polynomial division by zero"))
@@ -422,7 +379,7 @@
     q))
 
 (defn abs
-  [p]
+  [^Polynomial p]
   (let [R (.ring p)]
     (if (a/cmp R p (a/additive-identity R))
       (polynomial-negate p)
@@ -445,6 +402,14 @@
                                 (recur (mul x x) (quot c 2) a)
                                 (recur x (dec c) (mul x a)))))))
 
+(defn evaluate
+  [^Polynomial p xs]
+  (assert (= (.arity p) (count xs)))
+  (let [R (.ring p)
+        mul #(a/mul R %1 %2)
+        add #(a/add R %1 %2)]
+    (reduce add (a/additive-identity R) (for [[es c] (.terms p)]
+                (reduce mul c (map #(reduce mul 1 (repeat %1 %2)) es xs))))))
 
 (defn partial-derivative
   "The partial derivative of the polynomial with respect to the

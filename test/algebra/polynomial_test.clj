@@ -172,53 +172,6 @@
       (is (= [z2 x3 x2z2 xy2z] (monomial-sort graded-reverse-lex-order)))
       (is (= [z2 x3 xy2z x2z2] (monomial-sort graded-lex-order))))))
 
-(deftest poly-evaluate
-  (testing "arity 1"
-    (let [[k x] (basis a/NativeArithmetic 1)
-          p (reduce add [(scale 3 x) (scale 2 k)])]
-      (is (= 14 (evaluate p [4])))
-      (is (thrown? Error (evaluate p [3 2]))))
-    (testing "arity 2"
-      (let [[k x y] (basis a/NativeArithmetic 2)
-            p (expt (add x y) 2)]
-        (is (= 25 (evaluate p [2 3])))
-        (is (= (make [4 4 1]) (evaluate p [2])))))
-    (testing "arity 3"
-      (let [[k x y z] (basis a/NativeArithmetic 3)
-            p (reduce add [(expt x 3) (expt y 2) z k])]
-        (is (= 19 (evaluate p [2 3 1])))))
-    (testing "arity 4"
-      (let [[k w x y z] (basis a/NativeArithmetic 4)
-            p (expt (reduce sub [w x y z]) 2)]
-        (is (= 36 (evaluate p [10 1 2 1])))))
-    (testing "arity 5"
-      (let [[k v w x z y] (basis a/NativeArithmetic 5)
-            p (expt (reduce sub [v w x y z]) 2)]
-        (is (= 16 (evaluate p [10 1 2 1 2])))))
-    (testing "arity 10"
-      (let [[k x0 x1 x2 x3 x4 x5 x6 x7 x8 x9] (basis a/NativeArithmetic 10)
-            p (expt (reduce sub [x0 x1 x2 x3 x4 x5 x6 x7 x8 x9]) 3)]
-        (is (= 216 (evaluate p [10 1 2 1 2 -3 1 -2 -1 3])))))
-    (testing "constant polynomials"
-      (let [p1 (make [3])
-            p2 (make 2 [[[0 0] 5]])
-            p3 (make 3 [[[1 0 0] 1]])
-            p4 (make 3 [[[0 1 0] 1]])
-            p5 (make 3 [[[0 0 1] 1]])]
-        (is (= 3 (evaluate p1 [99])))
-        (is (= 5 (evaluate p2 [99 98])))
-        (is (= 7 (evaluate p3 [7 8 9])))
-        (is (= 8 (evaluate p4 [7 8 9])))
-        (is (= 9 (evaluate p5 [7 8 9])))))
-    (testing "partial application"
-      (let [[k x y z] (basis a/NativeArithmetic 3)
-            p (reduce add [k (scale 2 x) (scale 3 (mul x y)) (scale 4 (reduce mul [x y z]))])]
-        (is (= (let [[k y z] (basis a/NativeArithmetic 2)]
-                 (reduce add [(scale 3 k) (scale 3 y) (scale 4 (mul y z))])) (evaluate p [1])))
-        (is (= (make [9 8]) (evaluate p [1 2])))
-        (is (= 33 (evaluate p [1 2 3])))
-        (is (thrown? Error (evaluate p [1 2 3 4])))))))
-
 (deftest poly-partial-derivatives
   (let [V (make [1 2 3 4])
         U (make 2 [[[1 1] 3] [[2 2] 4] [[0 0] 5] [[0 3] 7] [[4 0] -2]])]
@@ -283,12 +236,4 @@
 (defspec lower-and-raise-arity-are-inverse num-tests
          (prop/for-all [p (gen/bind (gen/choose 2 10) generate-nonzero-poly)]
                        (= p (raise-arity (lower-arity p)))))
-
-(defspec evaluation-homomorphism num-tests
-         (gen/let [arity (gen/choose 1 6)]
-                  (prop/for-all [p (generate-poly arity)
-                                 q (generate-poly arity)
-                                 xs (gen/vector gen/int arity)]
-                                (= (*' (evaluate p xs) (evaluate q xs))
-                                   (evaluate (mul p q) xs)))))
 

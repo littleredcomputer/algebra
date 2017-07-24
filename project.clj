@@ -3,11 +3,14 @@
   :url "http://github.com/littleredcomputer/sicmutils"
   :license {:name "MIT"
             :url "http://www.opensource.org/licenses/MIT"}
-  :dependencies [[org.clojure/clojure "1.8.0"]]
+  :dependencies [[org.clojure/clojure "1.8.0"]
+                 [org.clojure/core.match "0.3.0-alpha4"]]
   :jvm-opts ["-Djava.util.logging.config.file=logging.properties"]
   :test-selectors {:default (complement :long)}
   :profiles {:test {:dependencies [[org.clojure/test.check "0.9.0"]
-                                   [org.clojure/core.match "0.3.0-alpha4"]]}
+                                   [criterium "0.4.4"]]}
+             :dev {:dependencies [[org.clojure/test.check "0.9.0"]
+                                  [criterium "0.4.4"]]}
 
              }
   )
