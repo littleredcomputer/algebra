@@ -84,26 +84,32 @@
                                 (shnf-pow? y) (let [[_ i p q] y]
                                                 (shnf-pow i (shnf* x p) (shnf* x q)))
                                 :else (a/mul r x y))))
-            (shnf-expt [x n]
-              (reduce shnf* (repeat n x)))
             (term->shnf [t]
               (reduce shnf* (ap/coefficient t) (let [xs (ap/exponents t)]
                                                  (for [i (range (count xs))
                                                        :let [e (nth xs i)]
                                                        :when (> e 0)]
-                                                   (shnf-expt (shnf-pop i [::pow 1 1 0]) e)))))]
+                                                   (if (> i 0)
+                                                     [::pop i [::pow e 1 0]]
+                                                     [::pow e 1 0])))))]
       (reduce shnf+ (a/additive-identity r) (map term->shnf (.terms p))))))
 
 (defn shnf-eval
   [^Ring r h xs]
-  (match [h]
-         [[::pop i p]] (recur r p #_(drop i xs) (subvec xs i))
-         [[::pow i p q]] (if xs
-                           (a/add r
-                                  (a/mul r
-                                         (reduce #(a/mul r %1 %2) (a/multiplicative-identity r) (repeat i (first xs)))
-                                         (shnf-eval r p xs))
-                                  (shnf-eval r q #_(next xs) (subvec xs 1)))
-                           (a/additive-identity r))
-         [_] h))
+  (let [k (count xs)
+        step (fn step [h o]
+               (if (vector? h)
+                 (let [f (first h)]
+                   (if (= ::pop f)
+                     (recur (nth h 2) (+ o (nth h 1)))
+                     (if (< o k)
+                       (a/add r
+                              (a/mul r
+                                     (reduce #(a/mul r %1 %2) (a/multiplicative-identity r) (repeat (nth h 1) (nth xs o)))
+                                     (step (nth h 2) o))
+                              (step (nth h 3) (inc o)))
+                       (a/additive-identity r))
+                     ))
+                 h))]
+    (step h 0)))
 
