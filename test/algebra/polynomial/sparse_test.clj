@@ -81,7 +81,7 @@
   [& args]
   (let [pxs (doall
               (gen/sample
-                (gen/bind (gen/choose 8 9)
+                (gen/bind (gen/choose 8 12)
                           #(gen/tuple (generate-poly gen/int %)
                                       (gen/vector gen/int %)))
                 256))

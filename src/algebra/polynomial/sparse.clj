@@ -95,21 +95,20 @@
       (reduce shnf+ (a/additive-identity r) (map term->shnf (.terms p))))))
 
 (defn shnf-eval
-  [^Ring r h xs]
+  [r h xs]
   (let [k (count xs)
         step (fn step [h o]
                (if (vector? h)
-                 (let [f (first h)]
-                   (if (= ::pop f)
-                     (recur (nth h 2) (+ o (nth h 1)))
-                     (if (< o k)
-                       (a/add r
-                              (a/mul r
-                                     (reduce #(a/mul r %1 %2) (a/multiplicative-identity r) (repeat (nth h 1) (nth xs o)))
-                                     (step (nth h 2) o))
-                              (step (nth h 3) (inc o)))
-                       (a/additive-identity r))
-                     ))
+                 (if (= ::pop (nth h 0))
+                   (recur (nth h 2) (+ o (nth h 1)))
+                   (if (< o k)
+                     (a/add r
+                            (a/mul r
+                                   (a/exponentiation-by-squaring r (nth xs o) (nth h 1))
+                                   (step (nth h 2) o))
+                            (step (nth h 3) (inc o)))
+                     (a/additive-identity r))
+                   )
                  h))]
     (step h 0)))
 

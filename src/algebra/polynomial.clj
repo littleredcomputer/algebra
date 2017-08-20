@@ -386,7 +386,8 @@
       p)))
 
 (defn expt
-  "Raise the polynomial p to the (integer) power n."
+  "Raise the polynomial p to the (integer) power n. Note: Zippel suggests
+  this algorithm may not be a win for polynomials. Research that."
   [^Polynomial p n]
   (when-not (and (integer? n) (>= n 0))
     (throw (ArithmeticException.
@@ -409,7 +410,7 @@
         mul #(a/mul R %1 %2)
         add #(a/add R %1 %2)]
     (reduce add (a/additive-identity R) (for [[es c] (.terms p)]
-                (reduce mul c (map #(reduce mul 1 (repeat %1 %2)) es xs))))))
+                (reduce mul c (map #(a/exponentiation-by-squaring R %1 %2) xs es))))))
 
 (defn partial-derivative
   "The partial derivative of the polynomial with respect to the

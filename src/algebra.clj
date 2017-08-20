@@ -37,3 +37,13 @@
     Object
     (toString [this] "NativeArithmetic")))
 
+(defn exponentiation-by-squaring
+  [r x e]
+  (if (= e 0) (multiplicative-identity r)
+              (loop [x x
+                     y (multiplicative-identity r)
+                     n e]
+                (cond (<= n 1) (mul r x y)
+                      (even? n) (recur (mul r x x) y (bit-shift-right n 1))
+                      :else (recur (mul r x x) (mul r x y) (bit-shift-right (dec n) 1))))))
+
