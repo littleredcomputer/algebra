@@ -7,6 +7,7 @@
             [clojure.test.check.clojure-test :refer [defspec]]
             [algebra.polynomial :refer :all]
             [clojure.walk :as walk]
+            [criterium.core :as c]
             [algebra :as a])
   (:import (algebra.polynomial Polynomial)
            (algebra Ring Field)))
@@ -188,9 +189,9 @@
   [arity]
   (gen/fmap #(make arity %)
             (gen/vector
-              (gen/tuple
-                (gen/vector gen/pos-int arity)
-                gen/int))))
+             (gen/tuple
+              (gen/vector gen/pos-int arity)
+              gen/int))))
 
 (defn generate-nonzero-poly
   [arity]
@@ -198,42 +199,58 @@
 
 (def ^:private num-tests 50)
 
-(defspec p+p=2p num-tests
-         (prop/for-all [^Polynomial p (gen/bind gen/nat generate-poly)]
-                       (= (add p p) (mul p (make-constant (.arity p) 2)))))
+(defspec add=concat+make
+  (gen/let [arity (gen/choose 1 10)]
+    (prop/for-all [p (generate-poly arity)
+                   q (generate-poly arity)]
+                  (= (add p q) (make (.arity p) (concat (.terms p) (.terms q)))))))
 
-(defspec p-p=0 num-tests
-         (prop/for-all [p (gen/bind gen/nat generate-poly)]
-                       (polynomial-zero? (sub p p))))
+(defspec p+p=2p
+  (prop/for-all [^Polynomial p (gen/bind gen/nat generate-poly)]
+                (= (add p p) (mul p (make-constant (.arity p) 2)))))
 
-(defspec pq-div-p=q num-tests
-         (gen/let [arity (gen/fmap inc gen/nat)]
-                  (prop/for-all [p (generate-poly arity)
-                                 q (generate-nonzero-poly arity)]
-                                (let [[Q R] (divide (mul p q) q)]
-                                  (and (polynomial-zero? R)
-                                       (= Q p))))))
+(defspec p-p=0
+  (prop/for-all [p (gen/bind gen/nat generate-poly)]
+                (polynomial-zero? (sub p p))))
 
-(defspec p+q=q+p num-tests
-         (gen/let [arity gen/nat]
-                  (prop/for-all [p (generate-poly arity)
-                                 q (generate-poly arity)]
-                                (= (add p q) (add q p)))))
+(defspec pq-div-p=q
+  (gen/let [arity (gen/choose 1 10)]
+    (prop/for-all [p (generate-poly arity)
+                   q (generate-nonzero-poly arity)]
+                  (let [[Q R] (divide (mul p q) q)]
+                    (and (polynomial-zero? R)
+                         (= Q p))))))
 
-(defspec pq=qp num-tests
-         (gen/let [arity gen/nat]
-                  (prop/for-all [p (generate-poly arity)
-                                 q (generate-poly arity)]
-                                (= (mul p q) (mul q p)))))
+(defspec p+q=q+p
+  (gen/let [arity gen/nat]
+    (prop/for-all [p (generate-poly arity)
+                   q (generate-poly arity)]
+                  (= (add p q) (add q p)))))
+
+(defspec pq=qp
+  (gen/let [arity gen/nat]
+    (prop/for-all [p (generate-poly arity)
+                   q (generate-poly arity)]
+                  (= (mul p q) (mul q p)))))
 
 (defspec p*_q+r_=p*q+p*r num-tests
-         (gen/let [arity gen/nat]
-                  (prop/for-all [p (generate-poly arity)
-                                 q (generate-poly arity)
-                                 r (generate-poly arity)]
-                                (= (mul p (add q r)) (add (mul p q) (mul p r))))))
+  (gen/let [arity gen/nat]
+    (prop/for-all [p (generate-poly arity)
+                   q (generate-poly arity)
+                   r (generate-poly arity)]
+                  (= (mul p (add q r)) (add (mul p q) (mul p r))))))
 
 (defspec lower-and-raise-arity-are-inverse num-tests
-         (prop/for-all [p (gen/bind (gen/choose 2 10) generate-nonzero-poly)]
-                       (= p (raise-arity (lower-arity p)))))
+  (prop/for-all [p (gen/bind (gen/choose 2 10) generate-nonzero-poly)]
+                (= p (raise-arity (lower-arity p)))))
 
+
+(defn -main
+  [& args]
+  (let [pqs  (gen/sample
+              (gen/bind (gen/choose 8 12)
+                        #(gen/tuple (generate-poly %)
+                                    (generate-poly %)))
+              256)]
+    (println "benchmark add")
+    (c/quick-bench (dorun (for [[p q] pqs] (add p q))))))

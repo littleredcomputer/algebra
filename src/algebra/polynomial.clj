@@ -30,7 +30,7 @@
 ;; Monomial Orderings
 ;;
 ;; These orderings are in the sense of Java: x.compareTo(y), so that
-;; this returns 1 if x > y, -1 if x < y, and 0 if x = y.
+;; this returns >0 if x > y, <0 if x < y, and ==0 if x = y.
 
 (defn lex-order
   "Lex order for monomials considers the power of x, then the power of y, etc."
@@ -134,7 +134,7 @@
 (defn degree
   [p]
   (if (polynomial-zero? p) -1
-                           (->> p lead-term exponents (reduce +))))
+      (->> p lead-term exponents (reduce +))))
 
 (defn coefficients
   [^Polynomial p]
@@ -162,13 +162,6 @@
                                           :when (not (a/additive-identity? R fc))]
                                       [xs fc])))))
 
-(defn map-exponents
-  "Map the function f over the exponents of each monomial in p,
-  returning a new Polynomial."
-  [f ^Polynomial p]
-  (make (.ring p) (.arity p) (for [[xs c] (.terms p)]
-                               [(f xs) c])))
-
 (defn polynomial-negate
   [^Polynomial p]
   (let [R (.ring p)]
@@ -181,7 +174,7 @@
   (->Polynomial a/NativeArithmetic
                 arity
                 (if (zero? c) empty-coefficients
-                              (conj empty-coefficients [(vec (repeat arity 0)) c]))))
+                    (conj empty-coefficients [(vec (repeat arity 0)) c]))))
 
 (defn basis
   [ring arity]
@@ -189,26 +182,47 @@
         (for [i (range arity)]
           (->Polynomial ring arity [[(vec (for [j (range arity)] (if (= i j) 1 0))) (a/multiplicative-identity ring)]]))))
 
+(defn ^:private compatible
+  [^Polynomial p ^Polynomial q]
+  (and (= (.ring p) (.ring q))
+       (= (.arity p) (.arity q))))
+
+(defn ^:private merge-term-lists
+  "Merges term lists, both assumed sorted. Terms with same exponents are
+  combined via op, and discarded if the combination is the additive
+  identity in the ring R."
+  [ps qs op R]
+  (loop [ps ps
+         qs qs
+         s empty-coefficients]
+    (cond (empty? ps) (into s qs)
+          (empty? qs) (into s ps)
+          :else (let [[pxs pc] (first ps)
+                      [qxs qc] (first qs)
+                      o (monomial-order pxs qxs)]
+                  (cond
+                    (zero? o) (recur (rest ps) (rest qs)
+                                     (let [sc (op R pc qc)]
+                                       (if (a/additive-identity? R sc)
+                                         s
+                                         (conj s [pxs sc]))))
+                    (< o 0) (recur (rest ps) qs (conj s [pxs pc]))
+                    :else (recur ps (rest qs) (conj s [qxs qc])))))))
+
 (defn add
   "Adds the polynomials p and q"
   [^Polynomial p ^Polynomial q]
   {:pre [(instance? Polynomial p)
-         (instance? Polynomial q)]}
-  (cond (polynomial-zero? p) q
-        (polynomial-zero? q) p
-        :else ((compatible-constructor p q) (concat (.terms p) (.terms q)))))
+         (instance? Polynomial q)
+         (compatible p q)]}
+  (let [R (.ring p)]
+    (->Polynomial R (.arity p)
+                  (merge-term-lists (.terms p) (.terms q) a/add R))))
 
 (defn sub
-  "Subtract the polynomial q from the polynomial p."
-  [^Polynomial p ^Polynomial q]
-  {:pre [(instance? Polynomial p)
-         (instance? Polynomial q)]}
-  (cond (polynomial-zero? p) (polynomial-negate q)
-        (polynomial-zero? q) p
-        :else (let [R (.ring p)]
-                ((compatible-constructor p q)
-                  (concat (.terms p) (for [[xs c] (.terms q)]
-                                       [xs (a/negate R c)]))))))
+  "Adds the polynomials p and q"
+  [p q]
+  (add p (polynomial-negate q)))
 
 (defn scale
   "Scalar multiply p by c, where c is in the same ring as the coefficients of p"
@@ -228,9 +242,9 @@
         (polynomial-one? q) p
         :else (let [R (.ring p)]
                 ((compatible-constructor p q)
-                  (for [[xp cp] (.terms p)
-                        [xq cq] (.terms q)]
-                    [(mapv + xp xq) (a/mul R cp cq)])))))
+                 (for [[xp cp] (.terms p)
+                       [xq cq] (.terms q)]
+                   [(mapv + xp xq) (a/mul R cp cq)])))))
 
 (defn polynomial-order
   [^Polynomial p ^Polynomial q]
@@ -391,7 +405,7 @@
   [^Polynomial p n]
   (when-not (and (integer? n) (>= n 0))
     (throw (ArithmeticException.
-             (str "can't raise poly to " n))))
+            (str "can't raise poly to " n))))
   (cond (polynomial-one? p) p
         (polynomial-zero? p) (if (zero? n)
                                (throw (ArithmeticException. "poly 0^0"))
@@ -399,9 +413,9 @@
         (zero? n) (polynomial-one-like p)
         :else (loop [x p c n a (polynomial-one-like p)]
                 (if (zero? c) a
-                              (if (even? c)
-                                (recur (mul x x) (quot c 2) a)
-                                (recur x (dec c) (mul x a)))))))
+                    (if (even? c)
+                      (recur (mul x x) (quot c 2) a)
+                      (recur x (dec c) (mul x a)))))))
 
 (defn evaluate
   [^Polynomial p xs]
@@ -410,7 +424,7 @@
         mul #(a/mul R %1 %2)
         add #(a/add R %1 %2)]
     (reduce add (a/additive-identity R) (for [[es c] (.terms p)]
-                (reduce mul c (map #(a/exponentiation-by-squaring R %1 %2) xs es))))))
+                                          (reduce mul c (map #(a/exponentiation-by-squaring R %1 %2) xs es))))))
 
 (defn partial-derivative
   "The partial derivative of the polynomial with respect to the
@@ -430,4 +444,3 @@
   [^Polynomial p]
   (for [i (range (.arity p))]
     (partial-derivative p i)))
-

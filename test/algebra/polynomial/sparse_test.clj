@@ -79,14 +79,18 @@
 
 (defn -main
   [& args]
-  (let [pxs (doall
-              (gen/sample
-                (gen/bind (gen/choose 8 12)
+  (let [pxs (-> (gen/bind (gen/choose 8 12)
                           #(gen/tuple (generate-poly gen/int %)
                                       (gen/vector gen/int %)))
-                256))
+                (gen/sample 256)
+                vec)
+        pqs (->> pxs
+                 (map first)
+                 (partition 2))
         shfxs (mapv #(vector (->shnf (first %)) (second %)) pxs)]
-    (println "begin")
-    (c/quick-bench (dorun (for [[p x] pxs] (shnf-evaluate p x))))
+    (println "benchmark ->shnf")
+    (c/quick-bench (dorun (for [[p x] pxs] (->shnf p))))
+    (println "benchmark ->evaluate")
     (c/quick-bench (dorun (for [[p x] pxs] (p/evaluate p x))))
+    (println "benchmark shnf-eval")
     (c/quick-bench (dorun (for [[s x] shfxs] (shnf-eval a/NativeArithmetic s x))))))
