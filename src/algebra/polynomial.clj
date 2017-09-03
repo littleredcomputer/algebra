@@ -8,7 +8,6 @@
 
 (declare operator-table operators-known make-constant)
 
-
 (def coefficient second)
 (def exponents first)
 
@@ -140,11 +139,11 @@
   [^Polynomial p]
   (->> p .terms (map coefficient)))
 
-(defn compatible-arity
+(defn compatible-ring
   [^Polynomial p ^Polynomial q]
   (assert (and (= (.arity p) (.arity q))
                (= (.ring p) (.ring q))))
-  (.arity p))
+  (.ring p))
 
 (defn compatible-constructor
   [^Polynomial p ^Polynomial q]
@@ -286,41 +285,6 @@
     Object
     (toString [this] (format "%s[%dv]" coefficient-ring arity))))
 
-(defn raise-arity
-  "The opposite of lower-arity."
-  [^Polynomial p]
-  {:pre [(instance? Polynomial p)
-         (= (.arity p) 1)]}
-  (let [terms (for [[x ^Polynomial q] (.terms p)
-                    [ys c] (.terms q)]
-                [(into x ys) c])
-        ^Polynomial ltc (coefficient (lead-term p))]
-    (make (.ring ltc) (inc (.arity ltc)) terms)))
-
-(defn lower-arity
-  "Given a nonzero polynomial of arity A > 1, return an equivalent polynomial
-  of arity 1 whose coefficients are polynomials of arity A-1."
-  [^Polynomial p]
-  {:pre [(instance? Polynomial p)
-         (> (.arity p) 1)
-         ;; XXX is this qualification needed (below, not zero)
-         (not (polynomial-zero? p))]}
-  ;; XXX observation:
-  ;; XXX we often create polynomials of "one lower arity"
-  ;; which are EFFECTIVELY UNIVARIATE. When this happens,
-  ;; we should notice.
-  ;; (but univariate in which variable? is it really that
-  ;; common that it's the first one?)
-  (let [R (.ring p)
-        A (.arity p)]
-    (->> p
-         .terms
-         (group-by #(-> % exponents first))
-         (map (fn [[x cs]]
-                [[x] (make (dec A) (for [[xs c] cs]
-                                     [(subvec xs 1) c]))]))
-         (make (PolynomialRing R (dec A)) 1))))
-
 (defn divide
   "Divide polynomial u by v, and return the pair of [quotient, remainder]
   polynomials. This assumes that the coefficients are drawn from a field,
@@ -351,35 +315,47 @@
                       [quotient remainder]))))))
 
 (defn pseudo-remainder
-  "Compute the pseudo-remainder of univariate polynomials p and
-  q. Fractions won't appear in the result; instead the divisor is
-  multiplied by the leading coefficient of the dividend before
-  quotient terms are generated so that division will not result in
-  fractions. Only the remainder is returned, together with the
-  integerizing factor needed to make this happen. Similar in spirit to
-  Knuth's algorithm 4.6.1R, except we don't multiply the remainder
-  through during gaps in the remainder. Since you don't know up front
-  how many times the integerizing multiplication will be done, we also
-  return the number d for which d * u = q * v + r."
+  [^Polynomial u ^Polynomial v]
+  {:pre [(= (.arity u) (.arity v) 1)]}
+  (let [R (compatible-ring u v)
+        deg-u (degree u)
+        deg-v (degree v)
+        δ (- deg-u deg-v)]
+    (if (< deg-u deg-v) u
+        (loop [w u]
+          (let [k (- (degree w) (degree v))
+                lcv (coefficient (lead-term v))
+                lcw (coefficient (lead-term w))
+                w' (sub
+                    (map-coefficients #(a/mul R lcv %) w)
+                    (mul v (->Polynomial R 1 [[[k] lcw]])))
+                k' (- (degree w') (degree v))]
+            (cond (polynomial-zero? w') w'
+                  (< (degree w') deg-v) (scale (a/exponentiation-by-squaring R lcv k) w')
+                  (> k (inc δ)) (let [e (- k (inc δ))
+                                      lcv**e (a/exponentiation-by-squaring R lcv e)]
+                                  (recur (scale lcv**e w')))
+                  :else (recur w')))))))
+
+(defn pseudo-remainder-classic
   [^Polynomial u ^Polynomial v]
   {:pre [(instance? Polynomial u)
          (instance? Polynomial v)
          (not (polynomial-zero? v))
          (= (.arity u) (.arity v) 1)]}
-  (let [ctor (compatible-constructor u v)
-        R (.ring u)
-        a (compatible-arity u v)
-        [vn-exponents vn-coefficient] (lead-term v)
-        *vn (partial scale vn-coefficient)
-        n (reduce + vn-exponents)]
-    (loop [remainder u d 0]
-      (let [m (degree remainder)
-            c (-> remainder lead-term coefficient)]
-        (if (< m n)
-          [remainder d]
-          (recur (sub (*vn remainder)
-                      (mul v (ctor [[[(- m n)] c]])))
-                 (inc d)))))))
+  (let [R (compatible-ring u v)
+        deg-u (degree u)
+        deg-v (degree v)
+        lcv (coefficient (lead-term v))
+        e (- (inc deg-u) deg-v)
+        lcv**e (a/exponentiation-by-squaring R lcv e)]
+    (second (divide (map-coefficients #(a/mul R lcv**e %) u) v))))
+
+(defn pseudo-remainder-sequence
+  [remainder]
+  (fn step [u v]
+    (if (polynomial-zero? v) (list u)
+        (cons u (lazy-seq (step v (remainder u v)))))))
 
 (defn evenly-divide
   "Divides the polynomial u by the polynomial v. Throws an IllegalStateException
