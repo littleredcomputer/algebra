@@ -259,6 +259,18 @@
                    r (generate-poly arity)]
                   (= (mul p (add q r)) (add (mul p q) (mul p r))))))
 
+(defspec univariate-gcd-test 10
+  (let [evenly-divides? #(polynomial-zero? (second (divide %2 %1)))]
+    (prop/for-all [k (generate-nonzero-poly 1)
+                   u (generate-nonzero-poly 1)
+                   v (generate-nonzero-poly 1)]
+                  (let [ku (mul k u)
+                        kv (mul k v)
+                        g (univariate-gcd ku kv)]
+                    (and (evenly-divides? g ku)
+                         (evenly-divides? g kv)
+                         (evenly-divides? k g))))))
+
 (defn -main
   [& args]
   (let [pqs  (gen/sample

@@ -225,10 +225,10 @@
 
 (defn scale
   "Scalar multiply p by c, where c is in the same ring as the coefficients of p"
-  [c ^Polynomial p]
+  [^Polynomial p c]
   {:pre [(instance? Polynomial p)
          (a/member? (.ring p) c)]}
-  (map-coefficients #(a/mul (.ring p) c %) p))
+  (map-coefficients #(a/mul (.ring p) % c) p))
 
 (defn mul
   "Multiply polynomials p and q, and return the product."
@@ -315,6 +315,7 @@
                       [quotient remainder]))))))
 
 (defn pseudo-remainder
+  "The algorithm PolyPseudoRemainder from Zippel, p.132"
   [^Polynomial u ^Polynomial v]
   {:pre [(= (.arity u) (.arity v) 1)]}
   (let [R (compatible-ring u v)
@@ -331,13 +332,20 @@
                     (mul v (->Polynomial R 1 [[[k] lcw]])))
                 k' (- (degree w') (degree v))]
             (cond (polynomial-zero? w') w'
-                  (< (degree w') deg-v) (scale (a/exponentiation-by-squaring R lcv k) w')
+                  (< (degree w') deg-v) (scale w' (a/exponentiation-by-squaring R lcv k))
                   (> k (inc δ)) (let [e (- k (inc δ))
                                       lcv**e (a/exponentiation-by-squaring R lcv e)]
-                                  (recur (scale lcv**e w')))
+                                  (recur (scale w' lcv**e)))
                   :else (recur w')))))))
 
+(defn univariate-gcd
+  [u v]
+  (if (polynomial-zero? v) u
+      (recur v (pseudo-remainder u v))))
+
 (defn pseudo-remainder-classic
+  "The pseudo-remainder straight from the definition. Makes no attempt
+  to control coefficient growth."
   [^Polynomial u ^Polynomial v]
   {:pre [(instance? Polynomial u)
          (instance? Polynomial v)
@@ -349,7 +357,10 @@
         lcv (coefficient (lead-term v))
         e (- (inc deg-u) deg-v)
         lcv**e (a/exponentiation-by-squaring R lcv e)]
-    (second (divide (map-coefficients #(a/mul R lcv**e %) u) v))))
+    (-> u
+        (scale lcv**e)
+        (divide v)
+        second)))
 
 (defn pseudo-remainder-sequence
   [remainder]
