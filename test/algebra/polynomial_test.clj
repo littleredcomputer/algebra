@@ -262,7 +262,7 @@
                    q (generate-poly arity)]
                   (= (mul p q) (mul q p)))))
 
-(defspec p*_q+r_=p*q+p*r num-tests
+(defspec p*_q+r_=p*q+p*r
   (gen/let [arity gen/nat]
     (prop/for-all [p (generate-poly arity)
                    q (generate-poly arity)

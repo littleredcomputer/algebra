@@ -328,7 +328,7 @@
                 lcv (coefficient (lead-term v))
                 lcw (coefficient (lead-term w))
                 w' (sub
-                    (map-coefficients #(a/mul R lcv %) w)
+                    (scale w lcv)
                     (mul v (->Polynomial R 1 [[[k] lcw]])))
                 k' (- (degree w') (degree v))]
             (cond (polynomial-zero? w') w'
@@ -342,7 +342,7 @@
   [^Polynomial p]
   {:pre [(= (.arity p) 1)]}
   (if (polynomial-zero? p) p
-      (a/euclid-gcd-seq (.ring p) (map coefficient (.terms p)))))
+      (a/euclid-gcd-seq (.ring p) (coefficients p))))
 
 (defn univariate-primitive-part
   [^Polynomial p]

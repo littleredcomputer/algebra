@@ -63,15 +63,15 @@
   [p xs]
   (shnf-eval a/NativeArithmetic (->shnf p) xs))
 
-(defspec evaluation-homomorphism 50
+(defspec evaluation-homomorphism
   (gen/let [arity (gen/choose 1 6)]
     (prop/for-all [p (generate-poly gen/int arity)
                    q (generate-poly gen/int arity)
                    xs (gen/vector gen/int arity)]
-                  (= (*' (shnf-evaluate p xs) (shnf-evaluate q xs))
-                     (shnf-evaluate (p/mul p q) xs)))))
+                  (= (*' (p/evaluate p xs) (p/evaluate q xs))
+                     (p/evaluate (p/mul p q) xs)))))
 
-(defspec naive-and-shnf-evaluation-agree 25
+(defspec naive-and-shnf-evaluation-agree
   (gen/let [arity (gen/choose 1 10)]
     (prop/for-all [p (generate-poly gen/int arity)
                    xs (gen/vector gen/int arity)]

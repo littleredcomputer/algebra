@@ -17,8 +17,8 @@
 
 (defspec gcd
   (let [R a/NativeArithmetic]
-    (prop/for-all [u (gen/such-that #(not (zero? %)) gen/nat)
-                   v (gen/such-that #(not (zero? %)) gen/int)]
+    (prop/for-all [u (gen/such-that (complement zero?) gen/nat)
+                   v (gen/such-that (complement zero?) gen/int)]
                   (let [g (a/euclid-gcd R u v)]
                     (and (a/evenly-divides? R g u)
                          (a/evenly-divides? R g v))))))
@@ -32,9 +32,9 @@
 
 (defspec nontrivial-gcd
   (let [R a/NativeArithmetic]
-    (prop/for-all [k (gen/such-that #(not (zero? %)) gen/nat)
-                   u (gen/such-that #(not (zero? %)) gen/nat)
-                   v (gen/such-that #(not (zero? %)) gen/int)]
+    (prop/for-all [k (gen/such-that (complement zero?) gen/nat)
+                   u (gen/such-that (complement zero?) gen/nat)
+                   v (gen/such-that (complement zero?) gen/int)]
                   (let [ku (* k u)
                         kv (* k v)
                         g (a/euclid-gcd R ku kv)]
@@ -44,7 +44,7 @@
 
 (defspec gcd-seq
   (let [R a/NativeArithmetic]
-    (prop/for-all [as (gen/not-empty (gen/vector (gen/such-that #(not (zero? %)) gen/int)))]
+    (prop/for-all [as (gen/not-empty (gen/vector (gen/such-that (complement zero?) gen/int)))]
                   (let [g (a/euclid-gcd-seq R as)]
                     (every? #(a/evenly-divides? R g %) as)))))
 
@@ -54,7 +54,7 @@
                                   as (gen/not-empty
                                       (gen/vector
                                        (gen/fmap #(* k %)
-                                                 (gen/such-that #(not (zero? %)) gen/int))))]
+                                                 (gen/such-that (complement zero?) gen/int))))]
 
                           [k as])]
                   (let [[k as] k-as
