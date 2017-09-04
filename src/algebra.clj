@@ -13,6 +13,10 @@
   (subtract [this x y])
   (negate [this x])
   (mul [this x y])
+  )
+
+(defprotocol Euclidean
+  (quotient [this x y])
   (remainder [this x y]))
 
 (defprotocol Field
@@ -31,6 +35,8 @@
     (subtract [this x y] (-' x y))
     (negate [this x] (-' x))
     (mul [this x y] (*' x y))
+    Euclidean
+    (quotient [this x y] (quot x y))
     (remainder [this x y] (rem x y))
     Ordered
     (cmp [this x y] (compare x y))

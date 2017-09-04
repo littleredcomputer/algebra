@@ -338,10 +338,23 @@
                                   (recur (scale w' lcv**e)))
                   :else (recur w')))))))
 
+(defn univariate-content
+  [^Polynomial p]
+  {:pre [(= (.arity p) 1)]}
+  (if (polynomial-zero? p) p
+      (a/euclid-gcd-seq (.ring p) (map coefficient (.terms p)))))
+
+(defn univariate-primitive-part
+  [^Polynomial p]
+  {:pre [(= (.arity p) 1)]}
+  (let [R (.ring p)
+        g (univariate-content p)]
+    (map-coefficients #(a/quotient R % g) p)))
+
 (defn univariate-gcd
   [u v]
   (if (polynomial-zero? v) u
-      (recur v (pseudo-remainder u v))))
+      (recur v (univariate-primitive-part (pseudo-remainder u v)))))
 
 (defn pseudo-remainder-classic
   "The pseudo-remainder straight from the definition. Makes no attempt
