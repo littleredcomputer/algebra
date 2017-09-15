@@ -281,20 +281,51 @@
                          (evenly-divides? g kv)
                          (evenly-divides? k g))))))
 
+(defspec univariate-subresultant-gcd-test
+  (let [evenly-divides? #(polynomial-zero? (second (divide %2 %1)))]
+    (prop/for-all [k (generate-nonzero-poly 1)
+                   u (generate-nonzero-poly 1)
+                   v (generate-nonzero-poly 1)]
+                  (let [ku (mul k u)
+                        kv (mul k v)
+                        g (univariate-subresultant-gcd ku kv)]
+                    (and (evenly-divides? g ku)
+                         (evenly-divides? g kv)
+                         (evenly-divides? k g))))))
+
+(defspec zippel-interpolation
+  (gen/let [n gen/s-pos-int]
+    (prop/for-all [xs (gen/vector-distinct gen/int {:num-elements n})
+                   ys (gen/vector gen/int n)]
+                  (let [p (zippel-algorithm-D xs ys)]
+                    (is (every? true? (map #(= %2 (evaluate p [%1])) xs ys)))))))
+
 (defn -main
   [& args]
-  (let [pqs  (gen/sample
+  #_(let [pqs  (gen/sample
               (gen/bind (gen/choose 8 12)
                         #(gen/tuple (generate-poly %)
                                     (generate-poly %)))
               256)]
     (println "benchmark add")
     (c/quick-bench (dorun (for [[p q] pqs] (add p q)))))
-  (let [pqs (gen/sample
+  #_(let [pqs (gen/sample
              (gen/let [u (generate-poly 1)
                        v (generate-nonzero-poly 1)
                        g (generate-nonzero-poly 1)]
                [(mul u g) (mul v g)])
              256)]
     (println "benchmark pr")
-    (c/quick-bench (dorun (for [[p q] pqs] (pseudo-remainder p q))))))
+    (c/quick-bench (dorun (for [[p q] pqs] (pseudo-remainder p q)))))
+  (let [pqs (gen/sample
+             (gen/let [k (generate-nonzero-poly 1)
+                       u (generate-nonzero-poly 1)
+                       v (generate-nonzero-poly 1)]
+               [(mul u k) (mul v k)])
+             8)]
+    (println "benchmark subresultant gcd")
+    (c/quick-bench (dorun (for [[uk vk] pqs] (univariate-subresultant-gcd uk vk))))
+    #_(println "benchmark gcd")
+    #_(c/quick-bench (dorun (for [[uk vk] pqs] (univariate-gcd uk vk))))
+)
+  )

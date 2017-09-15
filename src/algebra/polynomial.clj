@@ -338,24 +338,6 @@
                                   (recur (scale w' lcv**e)))
                   :else (recur w')))))))
 
-(defn univariate-content
-  [^Polynomial p]
-  {:pre [(= (.arity p) 1)]}
-  (if (polynomial-zero? p) p
-      (a/euclid-gcd-seq (.ring p) (coefficients p))))
-
-(defn univariate-primitive-part
-  [^Polynomial p]
-  {:pre [(= (.arity p) 1)]}
-  (let [R (.ring p)
-        g (univariate-content p)]
-    (map-coefficients #(a/quotient R % g) p)))
-
-(defn univariate-gcd
-  [u v]
-  (if (polynomial-zero? v) u
-      (recur v (univariate-primitive-part (pseudo-remainder u v)))))
-
 (defn pseudo-remainder-classic
   "The pseudo-remainder straight from the definition. Makes no attempt
   to control coefficient growth."
@@ -374,6 +356,51 @@
         (scale lcv**e)
         (divide v)
         second)))
+
+(defn univariate-content
+  [^Polynomial p]
+  {:pre [(= (.arity p) 1)]}
+  (if (polynomial-zero? p) p
+      (a/euclid-gcd-seq (.ring p) (coefficients p))))
+
+(defn univariate-primitive-part
+  [^Polynomial p]
+  {:pre [(= (.arity p) 1)]}
+  (let [R (.ring p)
+        g (univariate-content p)]
+    (map-coefficients #(a/quotient R % g) p)))
+
+(defn univariate-gcd
+  [u v]
+  (if (polynomial-zero? v) u
+      (recur v (univariate-primitive-part (pseudo-remainder u v)))))
+
+(defn univariate-subresultant-gcd
+  [^Polynomial u ^Polynomial v]
+  {:pre [(= (.arity u) (.arity v) 1)]}
+  (println "TOP")
+  (let [R (compatible-ring u v)
+        one (a/multiplicative-identity R)
+        minus-one (a/negate R (a/multiplicative-identity R))
+        du-dv (- (degree u) (degree v))]
+    (loop [u (if (>= du-dv 0) u v)
+           v (if (>= du-dv 0) v u)
+           h (a/multiplicative-identity R)]
+      (if (polynomial-zero? v) u
+          (let [δ (- (degree u) (degree v))
+                lcu (coefficient (lead-term u))
+                β (* (if (even? δ) minus-one one)
+                     lcu
+                     (a/exponentiation-by-squaring R h δ))]
+            (println "u" u)
+            (println "v" v)
+            (println "h" h "δ" δ "β" β)
+            (println "prc" (pseudo-remainder-classic u v))
+            (recur v
+                   (map-coefficients #(a/quotient R % β) (pseudo-remainder-classic u v))
+                   (a/mul R h (a/exponentiation-by-squaring R
+                               (a/quotient R (coefficient (lead-term v)) h)
+                               δ))))))))
 
 (defn pseudo-remainder-sequence
   [remainder]
@@ -444,3 +471,16 @@
   [^Polynomial p]
   (for [i (range (.arity p))]
     (partial-derivative p i)))
+
+(defn zippel-algorithm-D
+  [ps ms]
+  {:pre [(= (count ps) (count ms))]}
+  (loop [f (make [(first ms)])
+         q (make [(- (first ps)) 1])
+         [m & ms] (rest ms)
+         [p & ps] (rest ps)]
+    (if (nil? m) f
+        (recur (add f (map-coefficients #(/ (* % (- m (evaluate f [p]))) (evaluate q [p])) q))
+               (mul q (make [(- p) 1]))
+               ms
+               ps))))

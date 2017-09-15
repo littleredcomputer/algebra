@@ -47,13 +47,15 @@
 
 (defn exponentiation-by-squaring
   [R x e]
-  (if (= e 0) (multiplicative-identity R)
-              (loop [x x
-                     y (multiplicative-identity R)
-                     n e]
-                (cond (<= n 1) (mul R x y)
-                      (even? n) (recur (mul R x x) y (bit-shift-right n 1))
-                      :else (recur (mul R x x) (mul R x y) (bit-shift-right (dec n) 1))))))
+  (cond
+    (< e 0) (throw (IllegalArgumentException. "ring exponentiation to negative power"))
+    (= e 0) (multiplicative-identity R)
+    :else (loop [x x
+                 y (multiplicative-identity R)
+                 n e]
+            (cond (<= n 1) (mul R x y)
+                  (even? n) (recur (mul R x x) y (bit-shift-right n 1))
+                  :else (recur (mul R x x) (mul R x y) (bit-shift-right (dec n) 1))))))
 
 (defn evenly-divides?
   [R u v]

@@ -1,3 +1,5 @@
+;; Copyright © 2017 Colin Smith. MIT License.
+
 (ns algebra.polynomial.sparse-test
   (:require [clojure.test :refer :all]
             [clojure.test.check.generators :as gen]
