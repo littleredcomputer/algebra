@@ -153,13 +153,17 @@
   (testing "pseudo remainder sequence (Zippel p.132)"
     (let [F1 (make [-5 2 8 -3 -3 0 1 0 1])
           F2 (make [21 -9 -4 0 5 0 3])]
+      ;; As seen in:
+      ;; https://en.wikipedia.org/wiki/Polynomial_greatest_common_divisor#Pseudo-remainder_sequences
+      ;; "Trivial" PRS
       (is (= [F1
               F2
-              (make [-3 0 1 0 -5])
-              (make [441 -225 -117])
-              (make [224167500 -169966350])
-              (make [-1712229591042652500])]
-             ((pseudo-remainder-sequence pseudo-remainder) F1 F2)))
+              (make [-9 0 3 0 -15])
+              (make [-59535 30375 15795])
+              (make [-1654608338437500 1254542875143750])
+              (make [12593338795500743100931141992187500])]
+             ((pseudo-remainder-sequence pseudo-remainder-classic) F1 F2)))
+      ;; "Primitive" PRS
       (is (= [F1
               F2
               (make [-3 0 1 0 -5])
@@ -172,11 +176,11 @@
       ;; whose coefficients grow more slowly
       (is (= [F1
               F2
-              (make [-9 0 3 0 -15])
-              (make [-59535 30375 15795])
-              (make [-1654608338437500 1254542875143750])
-              (make [12593338795500743100931141992187500])]
-             ((pseudo-remainder-sequence pseudo-remainder-classic) F1 F2)))))
+              (make [-3 0 1 0 -5])
+              (make [441 -225 -117])
+              (make [224167500 -169966350])
+              (make [-1712229591042652500])]
+             ((pseudo-remainder-sequence pseudo-remainder) F1 F2)))))
   (testing "polynomial order"
     (let [Rx (PolynomialRing a/NativeArithmetic 1)]
       (is (= 1 (a/cmp Rx (make [2 1 1]) (make [2 1]))))

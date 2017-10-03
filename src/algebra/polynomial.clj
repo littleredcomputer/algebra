@@ -406,7 +406,7 @@
   [remainder]
   (fn step [u v]
     (if (polynomial-zero? v) (list u)
-        (cons u (lazy-seq (step v (remainder u v)))))))
+        (lazy-seq (cons u (step v (remainder u v)))))))
 
 (defn evenly-divide
   "Divides the polynomial u by the polynomial v. Throws an IllegalStateException

@@ -61,6 +61,10 @@
   [R u v]
   (additive-identity? R (remainder R v u)))
 
+(defn extended-euclid-algorithm
+  [R u v]
+  )
+
 (defn euclid-gcd
   [R u v]
   (let [step (fn [u v]
