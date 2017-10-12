@@ -375,6 +375,37 @@
   (if (polynomial-zero? v) u
       (recur v (univariate-primitive-part (pseudo-remainder u v)))))
 
+(defn zippel-subresultant-step
+  [u0 v0]
+  (let [R (compatible-ring u0 v0)
+        one (a/multiplicative-identity R)
+        minus-one (a/negate R one)
+        h (atom one)
+        ;;quo #(second (divide %1 %2))
+        quo #(pseudo-remainder-classic %1 %2)
+
+        ]
+    (fn [u v]
+      (let [δ (- (degree u) (degree v))
+            lcu (coefficient (lead-term u))
+            β (* (if (even? δ) minus-one one)
+                 lcu
+                 (a/exponentiation-by-squaring R @h δ))]
+        (println "u is " u)
+        (println "v is " v)
+        (println "h is " @h)
+        (swap! h #(a/mul R % (a/exponentiation-by-squaring
+                              R
+                              (a/quotient R
+                                          (coefficient (lead-term v))
+                                          %)
+                              δ)))
+        (map-coefficients #(a/quotient R % β) (quo u v))
+        )
+     ))
+  )
+
+
 (defn univariate-subresultant-gcd
   [^Polynomial u ^Polynomial v]
   {:pre [(= (.arity u) (.arity v) 1)]}
