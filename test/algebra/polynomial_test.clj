@@ -172,7 +172,7 @@
               (make [1])]
              ((pseudo-remainder-sequence #(univariate-primitive-part (pseudo-remainder %1 %2))) F1 F2)))
       ;; XXX
-      (is (= [F1
+      #_(is (= [F1
               F2
               (make [-3 0 1 0 -5])
               (make [441 -225 -117])
@@ -188,7 +188,17 @@
               (make [441 -225 -117])
               (make [224167500 -169966350])
               (make [-1712229591042652500])]
-             ((pseudo-remainder-sequence pseudo-remainder) F1 F2)))))
+             (subresultant-prs F1 F2)))
+      (is (= [(mul F1 F2) F2 (make [])]
+             (subresultant-polynomial-remainder-sequence (mul F1 F2) F2)))
+      (is (= []
+             (let [xm1 (make [-1 1])
+                   xm2 (make [-2 1])
+                   xp1 (make [1 1])]
+               (subresultant-polynomial-remainder-sequence
+                (mul (mul (expt xm1 4) (expt xm2 3)) (expt xp1 2))
+                (mul (mul (expt xm1 2) (expt xm2 3)) (expt xp1 4))))))))
+
   (testing "polynomial order"
     (let [Rx (PolynomialRing a/NativeArithmetic 1)]
       (is (= 1 (a/cmp Rx (make [2 1 1]) (make [2 1]))))

@@ -406,6 +406,61 @@
   )
 
 
+(defn subresultant-prs
+  [^Polynomial u ^Polynomial v]
+  {:pre [(= (.arity u) (.arity v) 1)]}
+  (let [R (compatible-ring u v)
+        one (a/multiplicative-identity R)
+        minus-one (a/negate R one)
+        δ0 (- (degree u) (degree v))]
+    ;; check this; then see if we can make it a sequence we generate (or do we care?)
+    ;; probably can eliminate "a" from this computation
+    ;; probably can eliminate "δr" from the argument list, and make it a local?
+    ;; i.e., both a and dr can be computed from prr and pr. However, the psi and beta values form a sequence,
+    ;; so we'll need to keep prr, pr, psi, beta.
+    ;; want: (step u v )
+    (loop [prr u
+           pr v
+           a (coefficient (lead-term v))
+           δr δ0
+           ψ one
+           β (if (even? δ0) minus-one one)]
+      (let [p (map-coefficients #(a/quotient R % β) (pseudo-remainder-classic prr pr))
+            δ (- (degree pr) (degree p))
+            ψ (a/quotient R (a/exponentiation-by-squaring R a δr)
+                          (a/exponentiation-by-squaring R ψ (dec δr)))
+            β (a/mul R (if (even? δ) minus-one one) (a/mul R (a/exponentiation-by-squaring R ψ δ) a))]
+        (recur pr
+               p
+               (coefficient (lead-term p))
+               δ
+               ψ
+               β)))))
+
+(defn subresultant-polynomial-remainder-sequence
+  [^Polynomial u ^Polynomial v]
+  {:pre [(= (.arity u) (.arity v) 1)]}
+  (let [R (compatible-ring u v)
+        one (a/multiplicative-identity R)
+        minus-one (a/negate R one)
+        δ0 (- (degree u) (degree v))]
+    ;; check this; then see if we can make it a sequence we generate (or do we care?)
+    ;; probably can eliminate "a" from this computation
+    ;; probably can eliminate "δr" from the argument list, and make it a local?
+    ;; i.e., both a and dr can be computed from prr and pr. However, the psi and beta values form a sequence,
+    ;; so we'll need to keep prr, pr, psi, beta.
+    ;; want: (step u v )
+    (defn step [prr pr a δr ψ β]
+      (println a δr ψ β)
+      (if (polynomial-zero? pr) nil
+          (let [p (map-coefficients #(a/quotient R % β) (pseudo-remainder-classic prr pr))
+                δ (- (degree pr) (degree p))
+                ψ (a/mul R ψ (a/exponentiation-by-squaring R (a/quotient R a ψ) δr))
+                β (a/mul R (if (even? δ) minus-one one) (a/mul R (a/exponentiation-by-squaring R ψ δ) a))]
+            (cons p (lazy-seq (step pr p (coefficient (lead-term p)) δ ψ β))))))
+    (lazy-seq (cons u (cons v (step u v (coefficient (lead-term v)) δ0 one (if (even? δ0) minus-one one)))))))
+
+
 (defn univariate-subresultant-gcd
   [^Polynomial u ^Polynomial v]
   {:pre [(= (.arity u) (.arity v) 1)]}
