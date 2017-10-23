@@ -370,72 +370,7 @@
         g (univariate-content p)]
     (map-coefficients #(a/quotient R % g) p)))
 
-(defn univariate-gcd
-  [u v]
-  (if (polynomial-zero? v) u
-      (recur v (univariate-primitive-part (pseudo-remainder u v)))))
 
-(defn zippel-subresultant-step
-  [u0 v0]
-  (let [R (compatible-ring u0 v0)
-        one (a/multiplicative-identity R)
-        minus-one (a/negate R one)
-        h (atom one)
-        ;;quo #(second (divide %1 %2))
-        quo #(pseudo-remainder-classic %1 %2)
-
-        ]
-    (fn [u v]
-      (let [δ (- (degree u) (degree v))
-            lcu (coefficient (lead-term u))
-            β (* (if (even? δ) minus-one one)
-                 lcu
-                 (a/exponentiation-by-squaring R @h δ))]
-        (println "u is " u)
-        (println "v is " v)
-        (println "h is " @h)
-        (swap! h #(a/mul R % (a/exponentiation-by-squaring
-                              R
-                              (a/quotient R
-                                          (coefficient (lead-term v))
-                                          %)
-                              δ)))
-        (map-coefficients #(a/quotient R % β) (quo u v))
-        )
-     ))
-  )
-
-
-(defn subresultant-prs
-  [^Polynomial u ^Polynomial v]
-  {:pre [(= (.arity u) (.arity v) 1)]}
-  (let [R (compatible-ring u v)
-        one (a/multiplicative-identity R)
-        minus-one (a/negate R one)
-        δ0 (- (degree u) (degree v))]
-    ;; check this; then see if we can make it a sequence we generate (or do we care?)
-    ;; probably can eliminate "a" from this computation
-    ;; probably can eliminate "δr" from the argument list, and make it a local?
-    ;; i.e., both a and dr can be computed from prr and pr. However, the psi and beta values form a sequence,
-    ;; so we'll need to keep prr, pr, psi, beta.
-    ;; want: (step u v )
-    (loop [prr u
-           pr v
-           a (coefficient (lead-term v))
-           δr δ0
-           ψ one
-           β (if (even? δ0) minus-one one)]
-      (let [p (map-coefficients #(a/quotient R % β) (pseudo-remainder-classic prr pr))
-            δ (- (degree pr) (degree p))
-            ψ (a/quotient R (a/exponentiation-by-squaring R a δr)
-                          (a/exponentiation-by-squaring R ψ (dec δr)))
-            β (a/mul R (if (even? δ) minus-one one) (a/mul R (a/exponentiation-by-squaring R ψ δ) a))]
-        (recur pr
-               p
-               (coefficient (lead-term p))
-               δ
-               ψ
-               β)))))
 
 (defn subresultant-polynomial-remainder-sequence
   [^Polynomial u ^Polynomial v]
@@ -443,50 +378,37 @@
   (let [R (compatible-ring u v)
         one (a/multiplicative-identity R)
         minus-one (a/negate R one)
-        δ0 (- (degree u) (degree v))]
-    ;; check this; then see if we can make it a sequence we generate (or do we care?)
-    ;; probably can eliminate "a" from this computation
-    ;; probably can eliminate "δr" from the argument list, and make it a local?
-    ;; i.e., both a and dr can be computed from prr and pr. However, the psi and beta values form a sequence,
-    ;; so we'll need to keep prr, pr, psi, beta.
-    ;; want: (step u v )
-    (defn step [prr pr a δr ψ β]
-      (println a δr ψ β)
-      (if (polynomial-zero? pr) nil
-          (let [p (map-coefficients #(a/quotient R % β) (pseudo-remainder-classic prr pr))
-                δ (- (degree pr) (degree p))
-                ψ (a/mul R ψ (a/exponentiation-by-squaring R (a/quotient R a ψ) δr))
-                β (a/mul R (if (even? δ) minus-one one) (a/mul R (a/exponentiation-by-squaring R ψ δ) a))]
-            (cons p (lazy-seq (step pr p (coefficient (lead-term p)) δ ψ β))))))
-    (lazy-seq (cons u (cons v (step u v (coefficient (lead-term v)) δ0 one (if (even? δ0) minus-one one)))))))
-
+        δ0 (- (degree u) (degree v))
+        ψ0 (if (even? δ0) minus-one one)]
+    (defn step [prr pr δr ψ β]
+      (let [p (map-coefficients #(a/quotient R % β) (pseudo-remainder-classic prr pr))
+            a (coefficient (lead-term pr))
+            ;; Choose form of expression to avoid negative exponents.
+            ψ (if (zero? δr)
+                (a/mul R (a/exponentiation-by-squaring R ψ (- 1 δr)) (a/exponentiation-by-squaring R a δr))
+                (a/quotient R (a/exponentiation-by-squaring R a δr)
+                            (a/exponentiation-by-squaring R ψ (dec δr))))
+            δ (- (degree pr) (degree p))
+            β (a/mul R (if (even? δ) minus-one one) (a/mul R (a/exponentiation-by-squaring R ψ δ) a))]
+        (if (polynomial-zero? p)
+          nil
+          (cons p (lazy-seq (step pr p δ ψ β))))))
+    (lazy-seq (cons u (cons v (if (< δ0 0)
+                                (step v u (- δ0) one ψ0)
+                                (step u v δ0 one ψ0)))))))
 
 (defn univariate-subresultant-gcd
-  [^Polynomial u ^Polynomial v]
-  {:pre [(= (.arity u) (.arity v) 1)]}
-  (println "TOP")
+  [u v]
   (let [R (compatible-ring u v)
-        one (a/multiplicative-identity R)
-        minus-one (a/negate R (a/multiplicative-identity R))
-        du-dv (- (degree u) (degree v))]
-    (loop [u (if (>= du-dv 0) u v)
-           v (if (>= du-dv 0) v u)
-           h (a/multiplicative-identity R)]
-      (if (polynomial-zero? v) u
-          (let [δ (- (degree u) (degree v))
-                lcu (coefficient (lead-term u))
-                β (* (if (even? δ) minus-one one)
-                     lcu
-                     (a/exponentiation-by-squaring R h δ))]
-            (println "u" u)
-            (println "v" v)
-            (println "h" h "δ" δ "β" β)
-            (println "prc" (pseudo-remainder-classic u v))
-            (recur v
-                   (map-coefficients #(a/quotient R % β) (pseudo-remainder-classic u v))
-                   (a/mul R h (a/exponentiation-by-squaring R
-                               (a/quotient R (coefficient (lead-term v)) h)
-                               δ))))))))
+        g (last (subresultant-polynomial-remainder-sequence u v))]
+    (if (zero? (degree g))
+      (a/multiplicative-identity R)
+      g)))
+
+(defn univariate-euclid-gcd
+  [u v]
+  (if (polynomial-zero? v) u
+      (recur v (univariate-primitive-part (pseudo-remainder u v)))))
 
 (defn pseudo-remainder-sequence
   [remainder]
