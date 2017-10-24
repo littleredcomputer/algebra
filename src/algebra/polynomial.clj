@@ -402,7 +402,7 @@
   (let [R (compatible-ring u v)
         g (last (subresultant-polynomial-remainder-sequence u v))]
     (if (zero? (degree g))
-      (a/multiplicative-identity R)
+      (->Polynomial R 1 (conj empty-coefficients [[0] (a/multiplicative-identity R)]))
       g)))
 
 (defn univariate-euclid-gcd
