@@ -288,33 +288,54 @@
                    r (generate-poly arity)]
                   (= (mul p (add q r)) (add (mul p q) (mul p r))))))
 
-#_(defspec univariate-gcd-test
-  (let [evenly-divides? #(polynomial-zero? (second (divide %2 %1)))]
-    (prop/for-all [k (generate-nonzero-poly 1)
-                   u (generate-nonzero-poly 1)
-                   v (generate-nonzero-poly 1)]
-                  (let [ku (mul k u)
-                        kv (mul k v)
-                        g (univariate-gcd ku kv)]
-                    (and (evenly-divides? g ku)
-                         (evenly-divides? g kv)
-                         (evenly-divides? k g))))))
+(def ^:private evenly-divides? #(polynomial-zero? (second (divide %2 %1))))
 
-(defspec univariate-subresultant-gcd-test
-  (let [evenly-divides? #(polynomial-zero? (second (divide %2 %1)))]
-    (prop/for-all [k (generate-nonzero-poly 1)
-                   uv (gen/such-that
-                       #(>= (degree (first %)) (degree (second %)))
-                       (gen/tuple (generate-nonzero-poly 1) (generate-nonzero-poly 1)))
-                   ]
-                  (let [ku (mul k (first uv))
-                        kv (mul k (second uv))
-                        g (univariate-subresultant-gcd ku kv)]
-                    (and (evenly-divides? g ku)
-                         (evenly-divides? g kv)
-                         (evenly-divides? k g))))))
+(defn int->binomial
+  "Given i, returns the binomial (x + i)."
+  [i]
+  (make 1 [[[0] i]
+           [[1] 1]]))
 
-(defspec zippel-interpolation
+(def ^:private unit-polynomial (make 1 [[[0] 1]]))
+
+(defn ^:private make-polynomial-from-ints
+  "Given integers i0, i1, ... returns the polynomial (x+i0)(x+i1)..."
+  [is]
+  (reduce mul unit-polynomial (map int->binomial is)))
+
+(def ^:private univariate-polynomial-gcd-test-case-generator
+  "A generator which initially generates a vector of integers, and then
+  partitions it into (typically) overlapping subsets. Returns the two
+  subsets along with the overlap. These are used to generate
+  polynomial pairs with (typically) nontrivial GCDs."
+  (gen/fmap
+   (fn [is]
+     (let [c (count is)
+           a0 (rand-int c)
+           b0 (rand-int c)
+           [a b] (if (> a0 b0) [b0 a0] [a0 b0])]
+       [(subvec is 0 b) (subvec is a c) (subvec is a b)]))
+   (gen/vector gen/int)))
+
+(defn ^:private test-univariate-polynomial-gcd-with
+  [gcd-er]
+  (fn [test-case]
+    (let [[u v k] (map make-polynomial-from-ints test-case)
+          g (gcd-er u v)]
+      (and (evenly-divides? g u)
+           (evenly-divides? g v)
+           (evenly-divides? k g)))))
+
+
+(defspec test-univariate-subresultant-gcd
+  (prop/for-all [test-case univariate-polynomial-gcd-test-case-generator]
+                ((test-univariate-polynomial-gcd-with univariate-subresultant-gcd) test-case)))
+
+(defspec test-univariate-euclid-gcd
+  (prop/for-all [test-case univariate-polynomial-gcd-test-case-generator]
+                ((test-univariate-polynomial-gcd-with univariate-euclid-gcd) test-case)))
+
+(defspec zippel-interpolation 10
   (gen/let [n gen/s-pos-int]
     (prop/for-all [xs (gen/vector-distinct gen/int {:num-elements n})
                    ys (gen/vector gen/int n)]
@@ -338,15 +359,14 @@
              256)]
     (println "benchmark pr")
     (c/quick-bench (dorun (for [[p q] pqs] (pseudo-remainder p q)))))
-  (let [pqs (gen/sample
-             (gen/let [k (generate-nonzero-poly 1)
-                       u (generate-nonzero-poly 1)
-                       v (generate-nonzero-poly 1)]
-               [(mul u k) (mul v k)])
-             100)]
+  (let [test-cases (gen/sample univariate-polynomial-gcd-test-case-generator 100)]
     (println "benchmark subresultant gcd")
-    (c/quick-bench (dorun (for [[uk vk] pqs] (univariate-subresultant-gcd uk vk))))
+    (let [sr-test (test-univariate-polynomial-gcd-with univariate-subresultant-gcd)]
+      (c/quick-bench
+       (dorun (for [test-case test-cases]
+                (sr-test test-case)))))
     (println "benchmark euclid gcd")
-    (c/quick-bench (dorun (for [[uk vk] pqs] (univariate-euclid-gcd uk vk))))
-)
-  )
+    (let [euc-test (test-univariate-polynomial-gcd-with univariate-euclid-gcd)]
+      (c/quick-bench
+       (dorun (for [test-case test-cases]
+                (euc-test test-case)))))))

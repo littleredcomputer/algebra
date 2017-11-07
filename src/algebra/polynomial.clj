@@ -400,7 +400,10 @@
 (defn univariate-subresultant-gcd
   [u v]
   (let [R (compatible-ring u v)
-        g (last (subresultant-polynomial-remainder-sequence u v))]
+        prs (if (> (degree u) (degree v))
+              (subresultant-polynomial-remainder-sequence u v)
+              (subresultant-polynomial-remainder-sequence v u))
+        g (last prs)]
     (if (zero? (degree g))
       (->Polynomial R 1 (conj empty-coefficients [[0] (a/multiplicative-identity R)]))
       g)))
