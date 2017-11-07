@@ -88,20 +88,20 @@
            (divide (make [-45 18 72 -27 -27 0 9]) (make [21 -9 -4 0 3]))))
     (let [U (make [-5 2 8 -3 -3 0 1 0 1])
           V (make [21 -9 -4 0 5 0 3])
-          pr (pseudo-remainder U V)]
+          pr (zippel-pseudo-remainder U V)]
       (is (= [(make [-2/9 0 1/3]) (make [-1/3 0 1/9 0 -5/9])] (divide U V)))
       (is (= (make [-3 0 1 0 -5]) pr)))
     ;; examples from http://www.mathworks.com/help/symbolic/mupad_ref/pdivide.html
     (let [p (make [1 1 0 1])
           q (make [1 1 3])]
-      (is (= (make [10 7]) (pseudo-remainder p q))))
+      (is (= (make [10 7]) (zippel-pseudo-remainder p q))))
     (let [p (make [3 0 4])
           q (make [2 2])]
-      (is (= (make [28]) (pseudo-remainder p q))))
+      (is (= (make [28]) (zippel-pseudo-remainder p q))))
     (is (= [(make 2 []) (make 2 [[[2 1] 1] [[1 2] 1]])]
            (divide (make 2 [[[2 1] 1] [[1 2] 1]]) (make 2 [[[1 2] 1]]))))
     (is (= [(make [1]) (make [])] (divide (make [3]) (make [3]))))
-    (is (= (make [0]) (pseudo-remainder (make [7]) (make [2])))))
+    (is (= (make [0]) (zippel-pseudo-remainder (make [7]) (make [2])))))
   (testing "expt"
     (let [x+1 (make [1 1])]
       (is (= (make [1]) (expt x+1 0)))
@@ -142,12 +142,12 @@
               CRC-8-ATM (reduce add [unit x (expt x 2) (expt x 8)])
               M (reduce add [unit x (expt x 2) (expt x 4) (expt x 6)])
               Mx8 (mul x8 M)
-              r1 (pseudo-remainder Mx8 CRC-8-ATM)
+              r1 (zippel-pseudo-remainder Mx8 CRC-8-ATM)
               CRC-16-CCITT (reduce add [unit (expt x 5) (expt x 12) (expt x 16)])
               x16 (mul x8 x8)
               T (reduce add [(expt x 2) (expt x 4) (expt x 6)])
               Tx16 (mul x16 T)
-              r2 (pseudo-remainder Tx16 CRC-16-CCITT)]
+              r2 (zippel-pseudo-remainder Tx16 CRC-16-CCITT)]
           (is (= (reduce add [x (expt x 5) (expt x 7)]) r1))
           (is (= (reduce add (map #(expt x %) [0 4 5 6 9 11 12])) r2))))))
   (testing "pseudo remainder sequences"
@@ -162,7 +162,7 @@
               (make [-59535 30375 15795])
               (make [-1654608338437500 1254542875143750])
               (make [12593338795500743100931141992187500])]
-             ((pseudo-remainder-sequence pseudo-remainder-classic) F1 F2)))
+             ((pseudo-remainder-sequence classic-pseudo-remainder) F1 F2)))
       ;; "Primitive" PRS
       (is (= [F1
               F2
@@ -170,15 +170,19 @@
               (make [-49 25 13])
               (make [-6150 4663])
               (make [1])]
-             ((pseudo-remainder-sequence #(univariate-primitive-part (pseudo-remainder %1 %2))) F1 F2)))
+             ((pseudo-remainder-sequence #(univariate-primitive-part (zippel-pseudo-remainder %1 %2))) F1 F2)))
       (is (= [(make [-5 2 8 -3 -3 0 1 0 1])
               (make [21 -9 -4 0 5 0 3])
               (make [9 0 -3 0 15])
               (make [-245 125 65])
               (make [-12300 9326])
-              (make [260708])
-              ]
-             (subresultant-polynomial-remainder-sequence F1 F2)))
+              (make [260708])              ]
+             ((subresultant-polynomial-remainder-sequence classic-pseudo-remainder) F1 F2)))
+      (is (= [(make [-5 2 8 -3 -3 0 1 0 1])
+              (make [21 -9 -4 0 5 0 3])
+              (make [3 0 -1 0 5])
+              (make [-1])]
+             ((subresultant-polynomial-remainder-sequence zippel-pseudo-remainder) F1 F2)))
       (is (= [(make [-8 28 -22 -31 60 -21 -22 23 -8 1])
               (make [-8 -4 26 9 -32 -5 18 -1 -4 1])
               (make [0 -32 48 40 -92 16 40 -24 4])
@@ -187,14 +191,14 @@
              (let [xm1 (make [-1 1])
                    xm2 (make [-2 1])
                    xp1 (make [1 1])]
-               (subresultant-polynomial-remainder-sequence
+               ((subresultant-polynomial-remainder-sequence zippel-pseudo-remainder)
                 (mul (mul (expt xm1 4) (expt xm2 3)) (expt xp1 2))
                 (mul (mul (expt xm1 2) (expt xm2 3)) (expt xp1 4))))))
       (is (= [(make [0 0 -2]) (make [0 -1])]
-             (subresultant-polynomial-remainder-sequence (make [0 0 -2]) (make [0 -1])
+             ((subresultant-polynomial-remainder-sequence zippel-pseudo-remainder) (make [0 0 -2]) (make [0 -1])
                                                          )))
       (is (= [(make [1]) (make [1])]
-             (subresultant-polynomial-remainder-sequence (make [1]) (make [1]))))))
+             ((subresultant-polynomial-remainder-sequence zippel-pseudo-remainder) (make [1]) (make [1]))))))
 
   (testing "polynomial order"
     (let [Rx (PolynomialRing a/NativeArithmetic 1)]
@@ -288,9 +292,11 @@
                    r (generate-poly arity)]
                   (= (mul p (add q r)) (add (mul p q) (mul p r))))))
 
-(def ^:private evenly-divides? #(polynomial-zero? (second (divide %2 %1))))
+(def ^:private evenly-divides?
+  "True if %1 evenly divides %2 with zero remainder."
+  #(-> %2 (divide %1) second polynomial-zero?))
 
-(defn int->binomial
+(defn ^:private int->binomial
   "Given i, returns the binomial (x + i)."
   [i]
   (make 1 [[[0] i]
@@ -358,7 +364,7 @@
                [(mul u g) (mul v g)])
              256)]
     (println "benchmark pr")
-    (c/quick-bench (dorun (for [[p q] pqs] (pseudo-remainder p q)))))
+    (c/quick-bench (dorun (for [[p q] pqs] (zippel-pseudo-remainder p q)))))
   (let [test-cases (gen/sample univariate-polynomial-gcd-test-case-generator 100)]
     (println "benchmark subresultant gcd")
     (let [sr-test (test-univariate-polynomial-gcd-with univariate-subresultant-gcd)]

@@ -314,7 +314,7 @@
                                (sub remainder (mul new-term v))))
                       [quotient remainder]))))))
 
-(defn pseudo-remainder
+(defn zippel-pseudo-remainder
   "The algorithm PolyPseudoRemainder from Zippel, p.132"
   [^Polynomial u ^Polynomial v]
   {:pre [(= (.arity u) (.arity v) 1)]}
@@ -338,7 +338,7 @@
                                   (recur (scale w' lcv**e)))
                   :else (recur w')))))))
 
-(defn pseudo-remainder-classic
+(defn classic-pseudo-remainder
   "The pseudo-remainder straight from the definition. Makes no attempt
   to control coefficient growth."
   [^Polynomial u ^Polynomial v]
@@ -370,39 +370,39 @@
         g (univariate-content p)]
     (map-coefficients #(a/quotient R % g) p)))
 
-
-
 (defn subresultant-polynomial-remainder-sequence
-  [^Polynomial u ^Polynomial v]
-  {:pre [(= (.arity u) (.arity v) 1)]}
-  (let [R (compatible-ring u v)
-        one (a/multiplicative-identity R)
-        minus-one (a/negate R one)
-        δ0 (- (degree u) (degree v))
-        ψ0 (if (even? δ0) minus-one one)]
-    (defn step [prr pr δr ψ β]
-      (let [p (map-coefficients #(a/quotient R % β) (pseudo-remainder-classic prr pr))
-            a (coefficient (lead-term pr))
-            ;; Choose form of expression to avoid negative exponents.
-            ψ (if (zero? δr)
-                (a/mul R (a/exponentiation-by-squaring R ψ (- 1 δr)) (a/exponentiation-by-squaring R a δr))
-                (a/quotient R (a/exponentiation-by-squaring R a δr)
-                            (a/exponentiation-by-squaring R ψ (dec δr))))
-            δ (- (degree pr) (degree p))
-            β (a/mul R (if (even? δ) minus-one one) (a/mul R (a/exponentiation-by-squaring R ψ δ) a))]
-        (if (polynomial-zero? p)
-          nil
-          (cons p (lazy-seq (step pr p δ ψ β))))))
-    (lazy-seq (cons u (cons v (if (< δ0 0)
-                                (step v u (- δ0) one ψ0)
-                                (step u v δ0 one ψ0)))))))
+  [pseudo-remainderer]
+  (fn [^Polynomial u ^Polynomial v]
+    (assert (= (.arity u) (.arity v) 1))
+    (let [R (compatible-ring u v)
+          one (a/multiplicative-identity R)
+          minus-one (a/negate R one)
+          δ0 (- (degree u) (degree v))
+          ψ0 (if (even? δ0) minus-one one)]
+      (defn step [prr pr δr ψ β]
+        (let [p (map-coefficients #(a/quotient R % β) (pseudo-remainderer prr pr))
+              a (coefficient (lead-term pr))
+              ψ (if (zero? δr)
+                  ψ ; Avoid negative exponent
+                  (a/quotient R (a/exponentiation-by-squaring R a δr)
+                              (a/exponentiation-by-squaring R ψ (dec δr))))
+              δ (- (degree pr) (degree p))
+              β (a/mul R (if (even? δ) minus-one one) (a/mul R (a/exponentiation-by-squaring R ψ δ) a))]
+          (if (polynomial-zero? p)
+            nil
+            (cons p (lazy-seq (step pr p δ ψ β))))))
+      (lazy-seq (cons u (cons v (if (< δ0 0)
+                                  (step v u (- δ0) one ψ0)
+                                  (step u v δ0 one ψ0))))))))
+
+(def ^:private zippel-srs (subresultant-polynomial-remainder-sequence zippel-pseudo-remainder))
 
 (defn univariate-subresultant-gcd
   [u v]
   (let [R (compatible-ring u v)
         prs (if (> (degree u) (degree v))
-              (subresultant-polynomial-remainder-sequence u v)
-              (subresultant-polynomial-remainder-sequence v u))
+              (zippel-srs u v)
+              (zippel-srs v u))
         g (last prs)]
     (if (zero? (degree g))
       (->Polynomial R 1 (conj empty-coefficients [[0] (a/multiplicative-identity R)]))
@@ -411,7 +411,7 @@
 (defn univariate-euclid-gcd
   [u v]
   (if (polynomial-zero? v) u
-      (recur v (univariate-primitive-part (pseudo-remainder u v)))))
+      (recur v (univariate-primitive-part (zippel-pseudo-remainder u v)))))
 
 (defn pseudo-remainder-sequence
   [remainder]
