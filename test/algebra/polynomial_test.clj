@@ -29,10 +29,6 @@
     (is (not (polynomial-one? (make [1.0]))))               ;; though maybe it should be
     (is (polynomial-one? (make (PolynomialRing a/NativeArithmetic 1) 1 [[[0] (make [1])]])))
     (is (not (polynomial-one? (make (PolynomialRing a/NativeArithmetic 1) 1 [[[0] (make [2])]])))))
-  (testing "make-constant"
-    (is (= (make [99]) (make-constant 1 99)))
-    (is (= (make 2 [[[0 0] 88]]) (make-constant 2 88)))
-    (is (= (make 3 [[[0 0 0] 77]]) (make-constant 3 77))))
   (testing "degree"
     (is (= (degree (make [])) -1))
     (is (= (degree (make [-1 1])) 1))
@@ -177,12 +173,7 @@
               (make [-245 125 65])
               (make [-12300 9326])
               (make [260708])              ]
-             ((subresultant-polynomial-remainder-sequence classic-pseudo-remainder) F1 F2)))
-      (is (= [(make [-5 2 8 -3 -3 0 1 0 1])
-              (make [21 -9 -4 0 5 0 3])
-              (make [3 0 -1 0 5])
-              (make [-1])]
-             ((subresultant-polynomial-remainder-sequence zippel-pseudo-remainder) F1 F2)))
+             (subresultant-polynomial-remainder-sequence F1 F2)))
       (is (= [(make [-8 28 -22 -31 60 -21 -22 23 -8 1])
               (make [-8 -4 26 9 -32 -5 18 -1 -4 1])
               (make [0 -32 48 40 -92 16 40 -24 4])
@@ -191,14 +182,14 @@
              (let [xm1 (make [-1 1])
                    xm2 (make [-2 1])
                    xp1 (make [1 1])]
-               ((subresultant-polynomial-remainder-sequence zippel-pseudo-remainder)
+               (subresultant-polynomial-remainder-sequence
                 (mul (mul (expt xm1 4) (expt xm2 3)) (expt xp1 2))
                 (mul (mul (expt xm1 2) (expt xm2 3)) (expt xp1 4))))))
       (is (= [(make [0 0 -2]) (make [0 -1])]
-             ((subresultant-polynomial-remainder-sequence zippel-pseudo-remainder) (make [0 0 -2]) (make [0 -1])
+             (subresultant-polynomial-remainder-sequence (make [0 0 -2]) (make [0 -1])
                                                          )))
       (is (= [(make [1]) (make [1])]
-             ((subresultant-polynomial-remainder-sequence zippel-pseudo-remainder) (make [1]) (make [1]))))))
+             (subresultant-polynomial-remainder-sequence (make [1]) (make [1]))))))
 
   (testing "polynomial order"
     (let [Rx (PolynomialRing a/NativeArithmetic 1)]
@@ -211,6 +202,11 @@
       (is (= 1 (a/cmp Rx (make [1 0 0 0 1 0]) (make [1 0 0 1 0 0]))))
       (is (= 1 (a/cmp Rx (make [1 0 0 2 0 0]) (make [1 0 0 1 0 0]))))
       (is (= -1 (a/cmp Rx (make [1 0 0 1 0 0]) (make [1 0 0 2 0 0]))))))
+
+  (testing "scalar multiplication"
+    (let [Rx (PolynomialRing a/NativeArithmetic 1)]
+      (is (= (make [3 6 9]) (a/scale Rx (make [1 2 3]) 3)))))
+
   (testing "monomial order"
     (let [x3 [3 0 0]
           x2z2 [2 0 2]
@@ -259,7 +255,8 @@
 
 (defspec p+p=2p
   (prop/for-all [^Polynomial p (gen/bind gen/nat generate-poly)]
-                (= (add p p) (mul p (make-constant (.arity p) 2)))))
+                (let [one (polynomial-one-like p)]
+                  (= (add p p) (mul p (add one one))))))
 
 (defspec p-p=0
   (prop/for-all [p (gen/bind gen/nat generate-poly)]
@@ -292,10 +289,6 @@
                    r (generate-poly arity)]
                   (= (mul p (add q r)) (add (mul p q) (mul p r))))))
 
-(def ^:private evenly-divides?
-  "True if %1 evenly divides %2 with zero remainder."
-  #(-> %2 (divide %1) second polynomial-zero?))
-
 (defn ^:private int->binomial
   "Given i, returns the binomial (x + i)."
   [i]
@@ -325,12 +318,13 @@
 
 (defn ^:private test-univariate-polynomial-gcd-with
   [gcd-er]
-  (fn [test-case]
-    (let [[u v k] (map make-polynomial-from-ints test-case)
-          g (gcd-er u v)]
-      (and (evenly-divides? g u)
-           (evenly-divides? g v)
-           (evenly-divides? k g)))))
+  (let [Rx (PolynomialRing a/NativeArithmetic 1)]
+    (fn [test-case]
+      (let [[u v k] (map make-polynomial-from-ints test-case)
+           g (gcd-er u v)]
+        (and (a/evenly-divides? Rx g u)
+             (a/evenly-divides? Rx g v)
+             (a/evenly-divides? Rx k g))))))
 
 
 (defspec test-univariate-subresultant-gcd
