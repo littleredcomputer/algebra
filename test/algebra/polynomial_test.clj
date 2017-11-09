@@ -29,10 +29,6 @@
     (is (not (polynomial-one? (make [1.0]))))               ;; though maybe it should be
     (is (polynomial-one? (make (PolynomialRing a/NativeArithmetic 1) 1 [[[0] (make [1])]])))
     (is (not (polynomial-one? (make (PolynomialRing a/NativeArithmetic 1) 1 [[[0] (make [2])]])))))
-  (testing "make-constant"
-    (is (= (make [99]) (make-constant 1 99)))
-    (is (= (make 2 [[[0 0] 88]]) (make-constant 2 88)))
-    (is (= (make 3 [[[0 0 0] 77]]) (make-constant 3 77))))
   (testing "degree"
     (is (= (degree (make [])) -1))
     (is (= (degree (make [-1 1])) 1))
@@ -259,7 +255,8 @@
 
 (defspec p+p=2p
   (prop/for-all [^Polynomial p (gen/bind gen/nat generate-poly)]
-                (= (add p p) (mul p (make-constant (.arity p) 2)))))
+                (let [one (polynomial-one-like p)]
+                  (= (add p p) (mul p (add one one))))))
 
 (defspec p-p=0
   (prop/for-all [p (gen/bind gen/nat generate-poly)]

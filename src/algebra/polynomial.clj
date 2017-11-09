@@ -166,15 +166,6 @@
   (let [R (.ring p)]
     (map-coefficients #(a/negate R %) p)))
 
-;; this doesn't mention the ring, so maybe we should get rid of it
-(defn make-constant
-  "Return a constant polynomial of the given arity in the ring of native arithmetic."
-  [arity c]
-  (->Polynomial a/NativeArithmetic
-                arity
-                (if (zero? c) empty-coefficients
-                    (conj empty-coefficients [(vec (repeat arity 0)) c]))))
-
 (defn basis
   [ring arity]
   (cons (->Polynomial ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity ring)]])
