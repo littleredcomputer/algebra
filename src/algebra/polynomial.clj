@@ -120,9 +120,7 @@
                      (sort-by exponents monomial-order)
                      (into empty-coefficients))))
   ([arity xc-pairs]
-   (make a/NativeArithmetic arity xc-pairs))
-  ([dense-coefficients]
-   (make 1 (zipmap (map vector (iterate inc 0)) dense-coefficients))))
+   (make a/NativeArithmetic arity xc-pairs)))
 
 (defn ^:private lead-term
   "Return the leading (i.e., highest degree) term of the polynomial
@@ -165,12 +163,6 @@
   [^Polynomial p]
   (let [R (.ring p)]
     (map-coefficients #(a/negate R %) p)))
-
-(defn coef
-  [^Polynomial p xs]
-  (if-let [s (seq (drop-while #(not= xs (first %)) (.terms p)))]
-    (second (first s))
-    (a/additive-identity (.ring p))))
 
 (defn basis
   [ring arity]
@@ -222,7 +214,7 @@
 
 (defn scale
   "Scalar multiply p by c, where c is in the same ring as the coefficients of p"
-  [^Polynomial p c]
+  [c ^Polynomial p]
   {:pre [(instance? Polynomial p)
          (a/member? (.ring p) c)]}
   (map-coefficients #(a/mul (.ring p) % c) p))
@@ -289,46 +281,48 @@
                                (sub remainder (mul new-term v))))
                       [quotient remainder]))))))
 
+(defn ^:private coefficient-of
+  [^Polynomial p xs]
+  (if-let [s (seq (drop-while #(not= xs (first %)) (.terms p)))]
+    (second (first s))
+    (a/additive-identity (.ring p))))
+
+(defprotocol IPolynomial
+  (make-dense [this dense-coefficients])
+  (coef [this p exponents]))
+
+(defmacro ^:private reify-polynomial
+  [coefficient-ring arity euclidean?]
+  `(reify
+     a/Ring
+     (member? [_ p#] (instance? Polynomial p#))
+     (additive-identity [_] (->Polynomial ~coefficient-ring ~arity []))
+     (additive-identity? [_ p#] (polynomial-zero? p#))
+     (multiplicative-identity [_]
+       (->Polynomial ~coefficient-ring ~arity
+                     [[(vec (repeat ~arity 0)) (a/multiplicative-identity ~coefficient-ring)]]))
+     (multiplicative-identity? [_ p#] (polynomial-one? p#))
+     (add [_ p# q#] (add p# q#))
+     (subtract [_ p# q#] (sub p# q#))
+     (negate [_ p#] (polynomial-negate p#))
+     (mul [_ p# q#] (mul p# q#))
+     ~@(if euclidean?
+         `(a/Euclidean
+           (quorem [_ p# q#] (divide p# q#))))
+     a/Ordered
+     (cmp [_ p# q#] (polynomial-order p# q#))
+     a/Module
+     (scale [_ r# p#] (scale r# p#))
+     IPolynomial
+     (make-dense [_ dense-coefficients#]
+       (make ~coefficient-ring 1 (map #(vector [%1] %2) (range) dense-coefficients#)))
+     (coef [_ p# exponents#] (coefficient-of p# exponents#))
+     Object
+     (toString [_] (format "%s[%dv]" ~coefficient-ring ~arity))))
+
 (defn PolynomialRing
   [coefficient-ring arity]
-  (if (= arity 1)
-    (reify
-      a/Ring
-      (member? [this p] (instance? Polynomial p))
-      (additive-identity [this] (->Polynomial coefficient-ring arity []))
-      (additive-identity? [this p] (polynomial-zero? p))
-      (multiplicative-identity [this] (->Polynomial coefficient-ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity coefficient-ring)]]))
-      (multiplicative-identity? [this p] (polynomial-one? p))
-      (add [this p q] (add p q))
-      (subtract [this p q] (sub p q))
-      (negate [this p] (polynomial-negate p))
-      (mul [this p q] (mul p q))
-      a/Euclidean
-      (quorem [this p q] (divide p q))
-      a/Ordered
-      (cmp [this p q] (polynomial-order p q))
-      a/Module
-      (scale [this p r] (scale p r))
-      Object
-      (toString [this] (format "%s[%dv]" coefficient-ring arity)))
-    ;; arity ≠ 1, so we don't support the Euclidean interface
-    (reify
-      a/Ring
-      (member? [this p] (instance? Polynomial p))
-      (additive-identity [this] (->Polynomial coefficient-ring arity []))
-      (additive-identity? [this p] (polynomial-zero? p))
-      (multiplicative-identity [this] (->Polynomial coefficient-ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity coefficient-ring)]]))
-      (multiplicative-identity? [this p] (polynomial-one? p))
-      (add [this p q] (add p q))
-      (subtract [this p q] (sub p q))
-      (negate [this p] (polynomial-negate p))
-      (mul [this p q] (mul p q))
-      a/Ordered
-      (cmp [this p q] (polynomial-order p q))
-      a/Module
-      (scale [this p r] (scale p r))
-      Object
-      (toString [this] (format "%s[%dv]" coefficient-ring arity)))))
+  (reify-polynomial coefficient-ring arity (= arity 1)))
 
 (defn zippel-pseudo-remainder
   "The algorithm PolyPseudoRemainder from Zippel, p.132"
@@ -344,14 +338,14 @@
                 lcv (coefficient (lead-term v))
                 lcw (coefficient (lead-term w))
                 w' (sub
-                    (scale w lcv)
+                    (scale lcv w)
                     (mul v (->Polynomial R 1 [[[k] lcw]])))
                 k' (- (degree w') (degree v))]
             (cond (polynomial-zero? w') w'
-                  (< (degree w') deg-v) (scale w' (a/exponentiation-by-squaring R lcv k))
+                  (< (degree w') deg-v) (scale (a/exponentiation-by-squaring R lcv k) w')
                   (> k (inc δ)) (let [e (- k (inc δ))
                                       lcv**e (a/exponentiation-by-squaring R lcv e)]
-                                  (recur (scale w' lcv**e)))
+                                  (recur (scale lcv**e w')))
                   :else (recur w')))))))
 
 (defn classic-pseudo-remainder
@@ -368,10 +362,7 @@
         lcv (coefficient (lead-term v))
         e (- (inc deg-u) deg-v)
         lcv**e (a/exponentiation-by-squaring R lcv e)]
-    (-> u
-        (scale lcv**e)
-        (divide v)
-        second)))
+    (second (divide (scale lcv**e u) v))))
 
 (defn univariate-content
   [^Polynomial p]
@@ -495,16 +486,3 @@
   [^Polynomial p]
   (for [i (range (.arity p))]
     (partial-derivative p i)))
-
-(defn zippel-algorithm-D
-  [ps ms]
-  {:pre [(= (count ps) (count ms))]}
-  (loop [f (make [(first ms)])
-         q (make [(- (first ps)) 1])
-         [m & ms] (rest ms)
-         [p & ps] (rest ps)]
-    (if (nil? m) f
-        (recur (add f (map-coefficients #(/ (* % (- m (evaluate f [p]))) (evaluate q [p])) q))
-               (mul q (make [(- p) 1]))
-               ms
-               ps))))
