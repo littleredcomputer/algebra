@@ -39,15 +39,6 @@
     (is (= (degree (P -1 0 2)) 2))
     (is (= (degree (P -1 2 0)) 1))
     (is (= (degree (P 0 0)) -1)))
-  (testing "zero-like"
-    (is (= (P) (polynomial-zero-like (P 1 2 3))))
-    (is (= (make 2 []) (polynomial-zero-like (make 2 [[[1 0] 1] [[2 1] 3]]))))
-    (is (= (make 3 []) (polynomial-zero-like (make 3 [[[1 2 1] 4] [[0 1 0] 5]])))))
-  (testing "one-like"
-    (is (= (P 1) (polynomial-one-like (P 1 2 3))))
-    (is (= (make 2 [[[0 0] 1]]) (polynomial-one-like (make 2 [[[1 0] 1] [[2 1] 3]]))))
-    (is (= (make 3 [[[0 0 0] 1]]) (polynomial-one-like (make 3 [[[1 2 1] 4] [[0 1 0] 5]]))))
-    (is (= (make 2 [[[0 0] 1]]) (polynomial-one-like (make 2 [])))))
   (testing "add constant"
     (is (= (P 3 0 2) (a/add Rx (P 0 0 2) (P 3))))
     (is (= (P 0 0 2) (a/add Rx (P 2 0 2) (P -2)))))
@@ -123,13 +114,14 @@
                   (negate [this x] (mod (- x) n))
                   (mul [this x y] (mod (* x y) n))))
           Z2 (Zmod 2)
+          Z2x (PolynomialRing Z2 1)
           P (make Z2 1 [[[2] 1] [[0] 1]])]
       (is (= (make Z2 1 [[[4] 1] [[0] 1]]) (a/exponentiation-by-squaring Rx P 2)))
       (is (= (make Z2 1 [[[6] 1] [[4] 1] [[2] 1] [[0] 1]]) (a/exponentiation-by-squaring Rx P 3)))
       (is (= (make Z2 1 [[[8] 1] [[0] 1]]) (a/mul Rx (a/exponentiation-by-squaring Rx P 3) P)))
       (is (= (make Z2 1 []) (a/subtract Rx P P)))
       (is (= (make Z2 1 []) (a/add Rx P P)))
-      (is (= (make Z2 1 [[[2] 1]]) (a/add Rx P (polynomial-one-like P))))
+      (is (= (make Z2 1 [[[2] 1]]) (a/add Rx P (a/multiplicative-identity Z2x))))
       (testing "CRC polynomials"
         ;; https://en.wikipedia.org/wiki/Computation_of_cyclic_redundancy_checks
         ;; http://www.lammertbies.nl/comm/info/crc-calculation.html
@@ -266,10 +258,14 @@
                    q (generate-poly arity)]
                   (= (a/add Rx p q) (make (.arity p) (concat (.terms p) (.terms q)))))))
 
-(defspec p+p=2p
-  (prop/for-all [^Polynomial p (gen/bind gen/nat generate-poly)]
-                (let [one (polynomial-one-like p)]
-                  (= (a/add Rx p p) (a/mul Rx p (a/add Rx one one))))))
+(defspec rp+sp=_r+s_p
+  (prop/for-all [[R p r s] (gen/bind gen/nat #(gen/tuple
+                                               (gen/return (PolynomialRing a/NativeArithmetic %))
+                                               (generate-poly %)
+                                               gen/ratio
+                                               gen/ratio))]
+                (= (a/add R (a/scale R r p) (a/scale R s p))
+                   (a/scale R (+ r s) p))))
 
 (defspec p-p=0
   (prop/for-all [p (gen/bind gen/nat generate-poly)]

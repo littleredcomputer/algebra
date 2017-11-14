@@ -12,9 +12,7 @@
 (def gen-vandermonde-test-case
   (gen/bind (gen/fmap inc gen/nat)
             #(gen/tuple
-              (gen/such-that
-               (fn [v] (= (count v) (count (distinct v))))
-               (gen/vector gen/ratio %))
+              (gen/vector-distinct gen/ratio {:num-elements %})
               (gen/vector gen/ratio %))))
 
 (def ^:private Rx (p/PolynomialRing a/NativeArithmetic 1))

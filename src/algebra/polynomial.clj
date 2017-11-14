@@ -104,11 +104,6 @@
       (let [[xs c] (first (.terms p))]
         (and (every? zero? xs)
              (a/multiplicative-identity? R c))))))
-(defn polynomial-zero-like [^Polynomial p] (->Polynomial (.ring p) (.arity p) empty-coefficients))
-(defn polynomial-one-like [^Polynomial p]
-  (let [R (.ring p)
-        a (.arity p)]
-    (->Polynomial R a [[(vec (repeat a 0)) (a/multiplicative-identity R)]])))
 
 (defn make
   "When called with two arguments, the first is the arity
@@ -273,8 +268,8 @@
   {:pre [(instance? Polynomial u)
          (instance? Polynomial v)]}
   (cond (polynomial-zero? v) (throw (IllegalArgumentException. "internal polynomial division by zero"))
-        (polynomial-zero? u) [(polynomial-zero-like u) u]
-        (polynomial-one? v) [u (polynomial-zero-like u)]
+        (polynomial-zero? u) [u u]
+        (polynomial-one? v) [u (->Polynomial (.ring u) (.arity u) empty-coefficients)]
         :else (let [ctor (compatible-constructor u v)
                     R (.ring u)
                     [vn-exponents vn-coefficient] (lead-term v)
