@@ -10,7 +10,7 @@
   (assert (= (count ks) (count ws)))
   (assert (> (count ks) 0))
   (let [Rx (p/PolynomialRing R 1)
-        ->binomial #(p/make-dense Rx [(a/negate R %1)
+        ->binomial #(p/make-unary Rx [(a/negate R %1)
                                       (a/multiplicative-identity R)])
         n (count ks)
         kbs (map ->binomial ks)

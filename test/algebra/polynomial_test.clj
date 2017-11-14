@@ -13,25 +13,25 @@
            (algebra Ring Field)))
 
 (def ^:private Rx (PolynomialRing a/NativeArithmetic 1))
-(def ^:private P #(make-dense Rx %&))
+(def ^:private P #(make-unary Rx %&))
 
 (deftest poly-core
   (testing "zero"
-    (is (polynomial-zero? (P)))
-    (is (polynomial-zero? (P 0)))
-    (is (polynomial-zero? (P)))
-    (is (polynomial-zero? (make Rx 2 [])))
-    (is (polynomial-zero? (make Rx 2 [])))
-    (is (not (polynomial-zero? (P 1)))))
+    (is (a/additive-identity? Rx (P)))
+    (is (a/additive-identity? Rx (P 0)))
+    (is (a/additive-identity? Rx (P)))
+    (is (a/additive-identity? Rx (make Rx 2 [])))
+    (is (a/additive-identity? Rx (make Rx 2 [])))
+    (is (not (a/additive-identity? Rx (P 1)))))
   (testing "unity"
-    (is (polynomial-one? (P 1)))
-    (is (polynomial-one? (make 2 [[[0 0] 1]])))
-    (is (polynomial-one? (make 3 [[[0 0 0] 1]])))
-    (is (not (polynomial-one? (make 3 [[[0 0 0] 1] [[0 0 1] 2]]))))
-    (is (not (polynomial-one? (P 1.1))))
-    (is (not (polynomial-one? (P 1.0))))               ;; though maybe it should be
-    (is (polynomial-one? (make (PolynomialRing a/NativeArithmetic 1) 1 [[[0] (P 1)]])))
-    (is (not (polynomial-one? (make (PolynomialRing a/NativeArithmetic 1) 1 [[[0] (P 2)]])))))
+    (is (a/multiplicative-identity? Rx (P 1)))
+    (is (a/multiplicative-identity? Rx (make 2 [[[0 0] 1]])))
+    (is (a/multiplicative-identity? Rx (make 3 [[[0 0 0] 1]])))
+    (is (not (a/multiplicative-identity? Rx (make 3 [[[0 0 0] 1] [[0 0 1] 2]]))))
+    (is (not (a/multiplicative-identity? Rx (P 1.1))))
+    (is (not (a/multiplicative-identity? Rx (P 1.0))))               ;; though maybe it should be
+    (is (a/multiplicative-identity? Rx (make (PolynomialRing a/NativeArithmetic 1) 1 [[[0] (P 1)]])))
+    (is (not (a/multiplicative-identity? Rx (make (PolynomialRing a/NativeArithmetic 1) 1 [[[0] (P 2)]])))))
   (testing "degree"
     (is (= (degree (P)) -1))
     (is (= (degree (P -1 1)) 1))
@@ -52,11 +52,11 @@
     (is (= (P 3 0 2) (add (P 0 0 2) (P 3))))
     (is (= (P 0 0 2) (add (P 2 0 2) (P -2)))))
   (testing "add/sub"
-    (is (polynomial-zero? (add (P 0 0 2) (P 0 0 -2))))
+    (is (a/additive-identity? Rx (add (P 0 0 2) (P 0 0 -2))))
     (is (= (P) (add (P 0 0 2) (P 0 0 -2))))
     (is (= (P 3) (add (P 3 0 2) (P 0 0 -2))))
     (is (= (P -1 1) (add (P 0 1) (P -1))))
-    (is (polynomial-zero? (sub (P 0 0 2) (P 0 0 2))))
+    (is (a/additive-identity? Rx (sub (P 0 0 2) (P 0 0 2))))
     (is (= (P -3) (sub (P 0 0 2) (P 3 0 2))))
     (is (= (P 0 1 2) (sub (P 3 1 2) (P 3))))
     (is (= (P -2 -2 -1) (sub (P 1) (P 3 2 1))))
@@ -66,7 +66,7 @@
   (testing "mul"
     (is (= (P) (mul (P 1 2 3) (P 0))))
     (is (= (P) (mul (P 0) (P 1 2 3))))
-    (is (= (P) (mul (P) (make-dense Rx [1 2 3]))))
+    (is (= (P) (mul (P) (make-unary Rx [1 2 3]))))
     (is (= (P 1 2 3) (mul (P 1 2 3) (P 1))))
     (is (= (P 1 2 3) (mul (P 1) (P 1 2 3))))
     (is (= (P 3 6 9) (mul (P 1 2 3) (P 3))))
@@ -244,7 +244,7 @@
 
 (defn generate-nonzero-poly
   [arity]
-  (gen/such-that (complement polynomial-zero?) (generate-poly arity)))
+  (gen/such-that #(not (a/additive-identity? Rx %)) (generate-poly arity)))
 
 (def ^:private num-tests 50)
 
@@ -261,14 +261,14 @@
 
 (defspec p-p=0
   (prop/for-all [p (gen/bind gen/nat generate-poly)]
-                (polynomial-zero? (sub p p))))
+                (a/additive-identity? Rx (sub p p))))
 
 (defspec pq-div-q=p
   (gen/let [arity (gen/choose 1 10)]
     (prop/for-all [p (generate-poly arity)
                    q (generate-nonzero-poly arity)]
                   (let [[Q R] (divide (mul p q) q)]
-                    (and (polynomial-zero? R)
+                    (and (a/additive-identity? Rx R)
                          (= Q p))))))
 
 (defspec p+q=q+p

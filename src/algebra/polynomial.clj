@@ -81,8 +81,8 @@
            (if (> c n) (format " ...and %d more terms" (- c n)))
            ")"))))
 
-(defn polynomial-zero? [^Polynomial p] (empty? (.terms p)))
-(defn polynomial-one?
+(defn ^:private polynomial-zero? [^Polynomial p] (empty? (.terms p)))
+(defn ^:private polynomial-one?
   "True if p has only a constant term which is equal to the multiplicative identity in its base ring"
   [^Polynomial p]
   (let [R (.ring p)
@@ -288,7 +288,7 @@
     (a/additive-identity (.ring p))))
 
 (defprotocol IPolynomial
-  (make-dense [this dense-coefficients])
+  (make-unary [this dense-coefficients])
   (coef [this p exponents]))
 
 (defmacro ^:private reify-polynomial
@@ -314,7 +314,7 @@
      a/Module
      (scale [_ r# p#] (scale r# p#))
      IPolynomial
-     (make-dense [_ dense-coefficients#]
+     (make-unary [_ dense-coefficients#]
        (make ~coefficient-ring 1 (map #(vector [%1] %2) (range) dense-coefficients#)))
      (coef [_ p# exponents#] (coefficient-of p# exponents#))
      Object

@@ -24,5 +24,5 @@
                 ;; The vandermonde solver computes a vector of polynomial
                 ;; coefficients. The polynomial built from those coefficients
                 ;; should map corresponding ks to ws
-                (let [p (p/make-dense Rx (solve a/NativeArithmetic ks ws))]
+                (let [p (p/make-unary Rx (solve a/NativeArithmetic ks ws))]
                   (every? true? (map #(= (p/evaluate p [%1]) %2) ks ws)))))
