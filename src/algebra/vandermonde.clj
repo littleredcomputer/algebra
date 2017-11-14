@@ -21,10 +21,8 @@
            x (vec (repeat n (a/additive-identity R)))]
       (if (= i n)
         x
-        (recur
-         (inc i)
-         (map-indexed
-          (fn [j xj]
-            (a/add R xj (a/mul R (nth ws i) (p/coef Rx (nth Pi i) [j])))
-            )
-          x))))))
+        (recur (inc i)
+               (map-indexed
+                (fn [j xj]
+                  (a/add R xj (a/mul R (nth ws i) (p/coef (nth Pi i) [j]))))
+                x))))))

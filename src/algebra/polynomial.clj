@@ -60,7 +60,20 @@
 ;; Polynomials
 ;;
 
+(defprotocol IPolynomial
+  (coef [this exponents])
+  (evaluate [this args]))
+
 (deftype Polynomial [ring arity terms]
+  IPolynomial
+  (coef [_ exponents]
+    (if-let [s (seq (drop-while #(not= exponents (first %)) terms))]
+      (second (first s))
+      (a/additive-identity ring)))
+  (evaluate [_ args]
+    (reduce (partial a/add ring) (a/additive-identity ring)
+            (for [[es c] terms]
+              (reduce (partial a/mul ring) c (map #(a/exponentiation-by-squaring ring %1 %2) args es)))))
   Object
   (equals [_ b]
     (and (instance? Polynomial b)
@@ -281,17 +294,10 @@
                                (sub remainder (mul new-term v))))
                       [quotient remainder]))))))
 
-(defn ^:private coefficient-of
-  [^Polynomial p xs]
-  (if-let [s (seq (drop-while #(not= xs (first %)) (.terms p)))]
-    (second (first s))
-    (a/additive-identity (.ring p))))
+(defprotocol IPolynomialConstructor
+  (make-unary [this dense-coefficients]))
 
-(defprotocol IPolynomial
-  (make-unary [this dense-coefficients])
-  (coef [this p exponents]))
-
-(defmacro ^:private reify-polynomial
+(defmacro ^:private reify-polynomial-ring
   [coefficient-ring arity euclidean?]
   `(reify
      a/Ring
@@ -313,16 +319,15 @@
      (cmp [_ p# q#] (polynomial-order p# q#))
      a/Module
      (scale [_ r# p#] (scale r# p#))
-     IPolynomial
+     IPolynomialConstructor
      (make-unary [_ dense-coefficients#]
        (make ~coefficient-ring 1 (map #(vector [%1] %2) (range) dense-coefficients#)))
-     (coef [_ p# exponents#] (coefficient-of p# exponents#))
      Object
      (toString [_] (format "%s[%dv]" ~coefficient-ring ~arity))))
 
 (defn PolynomialRing
   [coefficient-ring arity]
-  (reify-polynomial coefficient-ring arity (= arity 1)))
+  (reify-polynomial-ring coefficient-ring arity (= arity 1)))
 
 (defn zippel-pseudo-remainder
   "The algorithm PolyPseudoRemainder from Zippel, p.132"
@@ -429,15 +434,6 @@
     (if (a/cmp R p (a/additive-identity R))
       (polynomial-negate p)
       p)))
-
-(defn evaluate
-  [^Polynomial p xs]
-  (assert (= (.arity p) (count xs)))
-  (let [R (.ring p)
-        mul #(a/mul R %1 %2)
-        add #(a/add R %1 %2)]
-    (reduce add (a/additive-identity R) (for [[es c] (.terms p)]
-                                          (reduce mul c (map #(a/exponentiation-by-squaring R %1 %2) xs es))))))
 
 (defn partial-derivative
   "The partial derivative of the polynomial with respect to the
