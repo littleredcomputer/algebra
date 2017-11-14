@@ -13,41 +13,42 @@
             )
   (:import (algebra.polynomial Polynomial)))
 
-(deftest sparse-evaluation
-  (let [Rx (p/PolynomialRing a/NativeArithmetic 1)]
-    (is (= 8 (shnf-eval a/NativeArithmetic [::ps/pow 3 1 0] [2])))
-    (is (= 9 (shnf-eval a/NativeArithmetic [::ps/pow 3 1 1] [2])))
-    (is (= 16 (shnf-eval a/NativeArithmetic [::ps/pow 3 2 0] [2])))
-    (is (= 17 (shnf-eval a/NativeArithmetic [::ps/pow 3 2 1] [2])))
-    (is (= 7 (shnf-eval a/NativeArithmetic [::ps/pop 1
-                                            [::ps/pow 1 1 0]] [6 7 8])))
-    (is (= 8 (shnf-eval a/NativeArithmetic [::ps/pop 2
-                                            [::ps/pow 1 1 0]] [6 7 8])))
-    (is (= 16 (shnf-eval a/NativeArithmetic [::ps/pop 1 [::ps/pow 2 4 0]] [1 2 3])))
-    (is (= 186 (shnf-eval a/NativeArithmetic
-                          [::ps/pow 3
-                           [::ps/pow 1
-                            [::ps/pop 1
-                             [::ps/pow 2 4 0]]
-                            3]
-                           [::ps/pop 1
-                            [::ps/pow 4 2 5]]]
-                          [1 2 3])))
+(def ^:private Rx (p/PolynomialRing a/NativeArithmetic 1))
 
-    (is (= 1 (->shnf (p/make-unary Rx [1]))))
-    (is (= 99 (->shnf (p/make-unary Rx [99]))))
-    (is (= [::ps/pow 1 1 0] (->shnf (p/make-unary Rx [0 1]))))
-    (is (= [::ps/pow 2 1 0] (->shnf (p/make-unary Rx [0 0 1]))))
-    (is (= [::ps/pow 1 [::ps/pow 1 1 1] 0] (->shnf (p/make-unary Rx [0 1 1]))))
-    (is (= [::ps/pow 1 [::ps/pow 1 1 1] 1] (->shnf (p/make-unary Rx [1 1 1]))))
-    (let [[k x y z] (p/basis a/NativeArithmetic 3)
-          R (p/make a/NativeArithmetic 3 [[[4 2 0] 4]
-                                          [[3 0 0] 3]
-                                          [[0 0 4] 2]
-                                          [[0 0 0] 5]])
-          Rx (->shnf R)]
-      (is (= [::ps/pow 3 [::ps/pow 1 [::ps/pop 1 [::ps/pow 2 4 0]] 3] [::ps/pop 1 [::ps/pow 4 2 5]]] Rx))
-      (is (= 186 (shnf-eval a/NativeArithmetic Rx [1 2 3]))))))
+(deftest sparse-evaluation
+  (is (= 8 (shnf-eval a/NativeArithmetic [::ps/pow 3 1 0] [2])))
+  (is (= 9 (shnf-eval a/NativeArithmetic [::ps/pow 3 1 1] [2])))
+  (is (= 16 (shnf-eval a/NativeArithmetic [::ps/pow 3 2 0] [2])))
+  (is (= 17 (shnf-eval a/NativeArithmetic [::ps/pow 3 2 1] [2])))
+  (is (= 7 (shnf-eval a/NativeArithmetic [::ps/pop 1
+                                          [::ps/pow 1 1 0]] [6 7 8])))
+  (is (= 8 (shnf-eval a/NativeArithmetic [::ps/pop 2
+                                          [::ps/pow 1 1 0]] [6 7 8])))
+  (is (= 16 (shnf-eval a/NativeArithmetic [::ps/pop 1 [::ps/pow 2 4 0]] [1 2 3])))
+  (is (= 186 (shnf-eval a/NativeArithmetic
+                        [::ps/pow 3
+                         [::ps/pow 1
+                          [::ps/pop 1
+                           [::ps/pow 2 4 0]]
+                          3]
+                         [::ps/pop 1
+                          [::ps/pow 4 2 5]]]
+                        [1 2 3])))
+
+  (is (= 1 (->shnf (p/make-unary Rx [1]))))
+  (is (= 99 (->shnf (p/make-unary Rx [99]))))
+  (is (= [::ps/pow 1 1 0] (->shnf (p/make-unary Rx [0 1]))))
+  (is (= [::ps/pow 2 1 0] (->shnf (p/make-unary Rx [0 0 1]))))
+  (is (= [::ps/pow 1 [::ps/pow 1 1 1] 0] (->shnf (p/make-unary Rx [0 1 1]))))
+  (is (= [::ps/pow 1 [::ps/pow 1 1 1] 1] (->shnf (p/make-unary Rx [1 1 1]))))
+  (let [[k x y z] (p/basis a/NativeArithmetic 3)
+        R (p/make a/NativeArithmetic 3 [[[4 2 0] 4]
+                                        [[3 0 0] 3]
+                                        [[0 0 4] 2]
+                                        [[0 0 0] 5]])
+        Rx (->shnf R)]
+    (is (= [::ps/pow 3 [::ps/pow 1 [::ps/pop 1 [::ps/pow 2 4 0]] 3] [::ps/pop 1 [::ps/pow 4 2 5]]] Rx))
+    (is (= 186 (shnf-eval a/NativeArithmetic Rx [1 2 3])))))
 
 (defn generate-poly
   ([generator]
@@ -72,7 +73,7 @@
                    q (generate-poly gen/int arity)
                    xs (gen/vector gen/int arity)]
                   (= (*' (p/evaluate p xs) (p/evaluate q xs))
-                     (p/evaluate (p/mul p q) xs)))))
+                     (p/evaluate (a/mul Rx p q) xs)))))
 
 (defspec naive-and-shnf-evaluation-agree
   (gen/let [arity (gen/choose 1 10)]

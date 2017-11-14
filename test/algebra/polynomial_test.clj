@@ -49,46 +49,46 @@
     (is (= (make 3 [[[0 0 0] 1]]) (polynomial-one-like (make 3 [[[1 2 1] 4] [[0 1 0] 5]]))))
     (is (= (make 2 [[[0 0] 1]]) (polynomial-one-like (make 2 [])))))
   (testing "add constant"
-    (is (= (P 3 0 2) (add (P 0 0 2) (P 3))))
-    (is (= (P 0 0 2) (add (P 2 0 2) (P -2)))))
+    (is (= (P 3 0 2) (a/add Rx (P 0 0 2) (P 3))))
+    (is (= (P 0 0 2) (a/add Rx (P 2 0 2) (P -2)))))
   (testing "add/sub"
-    (is (a/additive-identity? Rx (add (P 0 0 2) (P 0 0 -2))))
-    (is (= (P) (add (P 0 0 2) (P 0 0 -2))))
-    (is (= (P 3) (add (P 3 0 2) (P 0 0 -2))))
-    (is (= (P -1 1) (add (P 0 1) (P -1))))
-    (is (a/additive-identity? Rx (sub (P 0 0 2) (P 0 0 2))))
-    (is (= (P -3) (sub (P 0 0 2) (P 3 0 2))))
-    (is (= (P 0 1 2) (sub (P 3 1 2) (P 3))))
-    (is (= (P -2 -2 -1) (sub (P 1) (P 3 2 1))))
-    (is (= (P 0 0 1 0 1 -1) (sub (P 1 0 1 0 1) (P 1 0 0 0 0 1))))
-    (is (= (P 0 0 -1 0 -1 1) (sub (P 1 0 0 0 0 1) (P 1 0 1 0 1))))
+    (is (a/additive-identity? Rx (a/add Rx (P 0 0 2) (P 0 0 -2))))
+    (is (= (P) (a/add Rx (P 0 0 2) (P 0 0 -2))))
+    (is (= (P 3) (a/add Rx (P 3 0 2) (P 0 0 -2))))
+    (is (= (P -1 1) (a/add Rx (P 0 1) (P -1))))
+    (is (a/additive-identity? Rx (a/subtract Rx (P 0 0 2) (P 0 0 2))))
+    (is (= (P -3) (a/subtract Rx (P 0 0 2) (P 3 0 2))))
+    (is (= (P 0 1 2) (a/subtract Rx (P 3 1 2) (P 3))))
+    (is (= (P -2 -2 -1) (a/subtract Rx (P 1) (P 3 2 1))))
+    (is (= (P 0 0 1 0 1 -1) (a/subtract Rx (P 1 0 1 0 1) (P 1 0 0 0 0 1))))
+    (is (= (P 0 0 -1 0 -1 1) (a/subtract Rx (P 1 0 0 0 0 1) (P 1 0 1 0 1))))
     (is (= (P -1 -2 -3) (polynomial-negate (P 1 2 3)))))
   (testing "mul"
-    (is (= (P) (mul (P 1 2 3) (P 0))))
-    (is (= (P) (mul (P 0) (P 1 2 3))))
-    (is (= (P) (mul (P) (make-unary Rx [1 2 3]))))
-    (is (= (P 1 2 3) (mul (P 1 2 3) (P 1))))
-    (is (= (P 1 2 3) (mul (P 1) (P 1 2 3))))
-    (is (= (P 3 6 9) (mul (P 1 2 3) (P 3))))
-    (is (= (P 0 1 2 3) (mul (P 0 1) (P 1 2 3))))
-    (is (= (P 0 -1 -2 -3) (mul (P 0 -1) (P 1 2 3))))
-    (is (= (P -1 0 1) (mul (P 1 1) (P -1 1))))
-    (is (= (P 1 3 3 1) (mul (P 1 1) (mul (P 1 1) (P 1 1)))))
-    (is (= (P 1 -4 6 -4 1) (mul (mul (P -1 1) (P -1 1))
-                                (mul (P -1 1) (P -1 1))))))
+    (is (= (P) (a/mul Rx (P 1 2 3) (P 0))))
+    (is (= (P) (a/mul Rx (P 0) (P 1 2 3))))
+    (is (= (P) (a/mul Rx (P) (make-unary Rx [1 2 3]))))
+    (is (= (P 1 2 3) (a/mul Rx (P 1 2 3) (P 1))))
+    (is (= (P 1 2 3) (a/mul Rx (P 1) (P 1 2 3))))
+    (is (= (P 3 6 9) (a/mul Rx (P 1 2 3) (P 3))))
+    (is (= (P 0 1 2 3) (a/mul Rx (P 0 1) (P 1 2 3))))
+    (is (= (P 0 -1 -2 -3) (a/mul Rx (P 0 -1) (P 1 2 3))))
+    (is (= (P -1 0 1) (a/mul Rx (P 1 1) (P -1 1))))
+    (is (= (P 1 3 3 1) (a/mul Rx (P 1 1) (a/mul Rx (P 1 1) (P 1 1)))))
+    (is (= (P 1 -4 6 -4 1) (a/mul Rx (a/mul Rx (P -1 1) (P -1 1))
+                                (a/mul Rx (P -1 1) (P -1 1))))))
   (testing "div"
     (is (= [(P 1 1) (P)]
-           (divide (P -1 0 1) (P -1 1))))
+           (a/quorem Rx (P -1 0 1) (P -1 1))))
     (is (= [(P -10 1) (P -32 -21)]
-           (divide (P -42 0 -12 1) (P 1 -2 1))))
+           (a/quorem Rx (P -42 0 -12 1) (P 1 -2 1))))
     (is (= [(P 3 1 1) (P 5)]
-           (divide (P -4 0 -2 1) (P -3 1))))
+           (a/quorem Rx (P -4 0 -2 1) (P -3 1))))
     (is (= [(P -5 0 3) (P 60 -27 -11)]
-           (divide (P -45 18 72 -27 -27 0 9) (P 21 -9 -4 0 3))))
+           (a/quorem Rx (P -45 18 72 -27 -27 0 9) (P 21 -9 -4 0 3))))
     (let [U (P -5 2 8 -3 -3 0 1 0 1)
           V (P 21 -9 -4 0 5 0 3)
           pr (zippel-pseudo-remainder U V)]
-      (is (= [(P -2/9 0 1/3) (P -1/3 0 1/9 0 -5/9)] (divide U V)))
+      (is (= [(P -2/9 0 1/3) (P -1/3 0 1/9 0 -5/9)] (a/quorem Rx U V)))
       (is (= (P -3 0 1 0 -5) pr)))
     ;; examples from http://www.mathworks.com/help/symbolic/mupad_ref/pdivide.html
     (let [p (P 1 1 0 1)
@@ -98,19 +98,19 @@
           q (P 2 2)]
       (is (= (P 28) (zippel-pseudo-remainder p q))))
     (is (= [(make 2 []) (make 2 [[[2 1] 1] [[1 2] 1]])]
-           (divide (make 2 [[[2 1] 1] [[1 2] 1]]) (make 2 [[[1 2] 1]]))))
-    (is (= [(P 1) (P)] (divide (P 3) (P 3))))
+           (a/quorem Rx (make 2 [[[2 1] 1] [[1 2] 1]]) (make 2 [[[1 2] 1]]))))
+    (is (= [(P 1) (P)] (a/quorem Rx (P 3) (P 3))))
     (is (= (P 0) (zippel-pseudo-remainder (P 7) (P 2)))))
   (testing "expt"
     (let [x+1 (P 1 1)]
-      (is (= (P 1) (expt x+1 0)))
-      (is (= x+1 (expt x+1 1)))
-      (is (= (P 1 2 1) (expt x+1 2)))
-      (is (= (P 1 3 3 1) (expt x+1 3)))
-      (is (= (P 1 4 6 4 1) (expt x+1 4)))
-      (is (= (P 1 5 10 10 5 1) (expt x+1 5)))))
+      (is (= (P 1) (a/exponentiation-by-squaring Rx x+1 0)))
+      (is (= x+1 (a/exponentiation-by-squaring Rx x+1 1)))
+      (is (= (P 1 2 1) (a/exponentiation-by-squaring Rx x+1 2)))
+      (is (= (P 1 3 3 1) (a/exponentiation-by-squaring Rx x+1 3)))
+      (is (= (P 1 4 6 4 1) (a/exponentiation-by-squaring Rx x+1 4)))
+      (is (= (P 1 5 10 10 5 1) (a/exponentiation-by-squaring Rx x+1 5)))))
   (testing "GF(2)"
-    (let [GFp (fn [p]
+    (let [Zmod (fn [n]
                 (reify
                   Ring
                   (member? [this x] (integer? x))
@@ -118,37 +118,52 @@
                   (additive-identity? [this x] (= x 0))
                   (multiplicative-identity [this] 1)
                   (multiplicative-identity? [this x] (= x 1))
-                  (add [this x y] (mod (+ x y) p))
-                  (subtract [this x y] (mod (- x y) p))
-                  (negate [this x] (mod (- x) p))
-                  (mul [this x y] (mod (* x y) p))
-                  Field
-                  (divide [this x y] ((* x y)))))
-          GF2 (GFp 2)
-          P (make GF2 1 [[[2] 1] [[0] 1]])]
-      (is (= (make GF2 1 [[[4] 1] [[0] 1]]) (expt P 2)))
-      (is (= (make GF2 1 [[[6] 1] [[4] 1] [[2] 1] [[0] 1]]) (expt P 3)))
-      (is (= (make GF2 1 [[[8] 1] [[0] 1]]) (mul (expt P 3) P)))
-      (is (= (make GF2 1 []) (sub P P)))
-      (is (= (make GF2 1 []) (add P P)))
-      (is (= (make GF2 1 [[[2] 1]]) (add P (polynomial-one-like P))))
+                  (add [this x y] (mod (+ x y) n))
+                  (subtract [this x y] (mod (- x y) n))
+                  (negate [this x] (mod (- x) n))
+                  (mul [this x y] (mod (* x y) n))))
+          Z2 (Zmod 2)
+          P (make Z2 1 [[[2] 1] [[0] 1]])]
+      (is (= (make Z2 1 [[[4] 1] [[0] 1]]) (a/exponentiation-by-squaring Rx P 2)))
+      (is (= (make Z2 1 [[[6] 1] [[4] 1] [[2] 1] [[0] 1]]) (a/exponentiation-by-squaring Rx P 3)))
+      (is (= (make Z2 1 [[[8] 1] [[0] 1]]) (a/mul Rx (a/exponentiation-by-squaring Rx P 3) P)))
+      (is (= (make Z2 1 []) (a/subtract Rx P P)))
+      (is (= (make Z2 1 []) (a/add Rx P P)))
+      (is (= (make Z2 1 [[[2] 1]]) (a/add Rx P (polynomial-one-like P))))
       (testing "CRC polynomials"
         ;; https://en.wikipedia.org/wiki/Computation_of_cyclic_redundancy_checks
         ;; http://www.lammertbies.nl/comm/info/crc-calculation.html
-        (let [x (make GF2 1 [[[1] 1]])
-              unit (make GF2 1 [[[0] 1]])
-              x8 (expt x 8)
-              CRC-8-ATM (reduce add [unit x (expt x 2) (expt x 8)])
-              M (reduce add [unit x (expt x 2) (expt x 4) (expt x 6)])
-              Mx8 (mul x8 M)
+        (let [Z2x (PolynomialRing Z2 1)
+              p+p (partial a/add Z2x)
+              x (make Z2 1 [[[1] 1]])
+              unit (make Z2 1 [[[0] 1]])
+              x8 (a/exponentiation-by-squaring Z2x x 8)
+              CRC-8-ATM (reduce p+p [unit
+                                     x
+                                     (a/exponentiation-by-squaring Z2x x 2)
+                                     (a/exponentiation-by-squaring Z2x x 8)])
+              M (reduce p+p [unit
+                             x
+                             (a/exponentiation-by-squaring Z2x x 2)
+                             (a/exponentiation-by-squaring Z2x x 4)
+                             (a/exponentiation-by-squaring Z2x x 6)])
+              Mx8 (a/mul Z2x x8 M)
               r1 (zippel-pseudo-remainder Mx8 CRC-8-ATM)
-              CRC-16-CCITT (reduce add [unit (expt x 5) (expt x 12) (expt x 16)])
-              x16 (mul x8 x8)
-              T (reduce add [(expt x 2) (expt x 4) (expt x 6)])
-              Tx16 (mul x16 T)
+              CRC-16-CCITT (reduce p+p [unit
+                                        (a/exponentiation-by-squaring Z2x x 5)
+                                        (a/exponentiation-by-squaring Z2x x 12)
+                                        (a/exponentiation-by-squaring Z2x x 16)])
+              x16 (a/mul Z2x x8 x8)
+              T (reduce p+p [(a/exponentiation-by-squaring Z2x x 2)
+                             (a/exponentiation-by-squaring Z2x x 4)
+                             (a/exponentiation-by-squaring Z2x x 6)])
+              Tx16 (a/mul Z2x x16 T)
               r2 (zippel-pseudo-remainder Tx16 CRC-16-CCITT)]
-          (is (= (reduce add [x (expt x 5) (expt x 7)]) r1))
-          (is (= (reduce add (map #(expt x %) [0 4 5 6 9 11 12])) r2))))))
+          (is (not= Z2x Rx))
+          (is (= (reduce p+p [x
+                              (a/exponentiation-by-squaring Z2x x 5)
+                              (a/exponentiation-by-squaring Z2x x 7)]) r1))
+          (is (= (reduce p+p (map #(a/exponentiation-by-squaring Z2x x %) [0 4 5 6 9 11 12])) r2))))))
   (testing "pseudo remainder sequences"
     (let [F1 (P -5 2 8 -3 -3 0 1 0 1)
           F2 (P 21 -9 -4 0 5 0 3)]
@@ -186,8 +201,8 @@
                    xm2 (P -2 1)
                    xp1 (P 1 1)]
                (subresultant-polynomial-remainder-sequence
-                (mul (mul (expt xm1 4) (expt xm2 3)) (expt xp1 2))
-                (mul (mul (expt xm1 2) (expt xm2 3)) (expt xp1 4))))))
+                (a/mul Rx (a/mul Rx (a/exponentiation-by-squaring Rx xm1 4) (a/exponentiation-by-squaring Rx xm2 3)) (a/exponentiation-by-squaring Rx xp1 2))
+                (a/mul Rx (a/mul Rx (a/exponentiation-by-squaring Rx xm1 2) (a/exponentiation-by-squaring Rx xm2 3)) (a/exponentiation-by-squaring Rx xp1 4))))))
       (is (= [(P 0 0 -2) (P 0 -1)]
              (subresultant-polynomial-remainder-sequence (P 0 0 -2) (P 0 -1))))
       (is (= [(P 1) (P 1)]
@@ -218,10 +233,7 @@
           monomial-sort #(sort-by identity % monomials)]
       (is (= [z2 xy2z x2z2 x3] (monomial-sort lex-order)))
       (is (= [z2 x3 x2z2 xy2z] (monomial-sort graded-reverse-lex-order)))
-      (is (= [z2 x3 xy2z x2z2] (monomial-sort graded-lex-order)))))
-  (testing "primitive part"
-    (is (= (P 1 2 3 4) (univariate-primitive-part (P 2 4 6 8))))
-    (is (= (P 2 3 4 5) (univariate-primitive-part (P 2 3 4 5))))))
+      (is (= [z2 x3 xy2z x2z2] (monomial-sort graded-lex-order))))))
 
 (deftest poly-partial-derivatives
   (let [V (P 1 2 3 4)
@@ -252,22 +264,22 @@
   (gen/let [arity (gen/choose 1 10)]
     (prop/for-all [p (generate-poly arity)
                    q (generate-poly arity)]
-                  (= (add p q) (make (.arity p) (concat (.terms p) (.terms q)))))))
+                  (= (a/add Rx p q) (make (.arity p) (concat (.terms p) (.terms q)))))))
 
 (defspec p+p=2p
   (prop/for-all [^Polynomial p (gen/bind gen/nat generate-poly)]
                 (let [one (polynomial-one-like p)]
-                  (= (add p p) (mul p (add one one))))))
+                  (= (a/add Rx p p) (a/mul Rx p (a/add Rx one one))))))
 
 (defspec p-p=0
   (prop/for-all [p (gen/bind gen/nat generate-poly)]
-                (a/additive-identity? Rx (sub p p))))
+                (a/additive-identity? Rx (a/subtract Rx p p))))
 
 (defspec pq-div-q=p
   (gen/let [arity (gen/choose 1 10)]
     (prop/for-all [p (generate-poly arity)
                    q (generate-nonzero-poly arity)]
-                  (let [[Q R] (divide (mul p q) q)]
+                  (let [[Q R] (a/quorem Rx (a/mul Rx p q) q)]
                     (and (a/additive-identity? Rx R)
                          (= Q p))))))
 
@@ -275,26 +287,26 @@
   (gen/let [arity gen/nat]
     (prop/for-all [p (generate-poly arity)
                    q (generate-poly arity)]
-                  (= (add p q) (add q p)))))
+                  (= (a/add Rx p q) (a/add Rx q p)))))
 
 (defspec pq=qp
   (gen/let [arity gen/nat]
     (prop/for-all [p (generate-poly arity)
                    q (generate-poly arity)]
-                  (= (mul p q) (mul q p)))))
+                  (= (a/mul Rx p q) (a/mul Rx q p)))))
 
 (defspec p*_q+r_=p*q+p*r
   (gen/let [arity gen/nat]
     (prop/for-all [p (generate-poly arity)
                    q (generate-poly arity)
                    r (generate-poly arity)]
-                  (= (mul p (add q r)) (add (mul p q) (mul p r))))))
+                  (= (a/mul Rx p (a/add Rx q r)) (a/add Rx (a/mul Rx p q) (a/mul Rx p r))))))
 
 
 (defn ^:private make-polynomial-from-ints
   "Given integers i0, i1, ... returns the polynomial (x+i0)(x+i1)..."
   [is]
-  (reduce mul (P 1) (map #(P % 1) is)))
+  (reduce #(a/mul Rx %1 %2) (P 1) (map #(P % 1) is)))
 
 (def ^:private univariate-polynomial-gcd-test-case-generator
   "A generator which initially generates a vector of integers, and then
@@ -337,12 +349,12 @@
                                     (generate-poly %)))
               256)]
     (println "benchmark add")
-    (c/quick-bench (dorun (for [[p q] pqs] (add p q)))))
+    (c/quick-bench (dorun (for [[p q] pqs] (a/add Rx p q)))))
   #_(let [pqs (gen/sample
              (gen/let [u (generate-poly 1)
                        v (generate-nonzero-poly 1)
                        g (generate-nonzero-poly 1)]
-               [(mul u g) (mul v g)])
+               [(a/mul Rx u g) (a/mul Rx v g)])
              256)]
     (println "benchmark pr")
     (c/quick-bench (dorun (for [[p q] pqs] (zippel-pseudo-remainder p q)))))

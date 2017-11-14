@@ -197,7 +197,7 @@
                     (< o 0) (recur (rest ps) qs (conj s [pxs pc]))
                     :else (recur ps (rest qs) (conj s [qxs qc])))))))
 
-(defn add
+(defn ^:private add
   "Adds the polynomials p and q"
   [^Polynomial p ^Polynomial q]
   {:pre [(instance? Polynomial p)
@@ -207,19 +207,19 @@
     (->Polynomial R (.arity p)
                   (merge-term-lists (.terms p) (.terms q) a/add R))))
 
-(defn sub
+(defn ^:private sub
   "Adds the polynomials p and q"
   [p q]
   (add p (polynomial-negate q)))
 
-(defn scale
+(defn ^:private scale
   "Scalar multiply p by c, where c is in the same ring as the coefficients of p"
   [c ^Polynomial p]
   {:pre [(instance? Polynomial p)
          (a/member? (.ring p) c)]}
   (map-coefficients #(a/mul (.ring p) % c) p))
 
-(defn mul
+(defn ^:private mul
   "Multiply polynomials p and q, and return the product."
   [^Polynomial p ^Polynomial q]
   {:pre [(instance? Polynomial p)
@@ -234,7 +234,7 @@
                        [xq cq] (.terms q)]
                    [(mapv + xp xq) (a/mul R cp cq)])))))
 
-(defn polynomial-order
+(defn ^:private polynomial-order
   [^Polynomial p ^Polynomial q]
   {:pre [(instance? Polynomial p)
          (instance? Polynomial q)
@@ -252,7 +252,7 @@
                         (if (not= k 0) k (recur (next pterms) (next qterms))))
                       mo))))))
 
-(defn divide
+(defn ^:private divide
   "Divide polynomial u by v, and return the pair of [quotient, remainder]
   polynomials. This assumes that the coefficients are drawn from a field,
   and so support division."
@@ -364,7 +364,7 @@
         lcv**e (a/exponentiation-by-squaring R lcv e)]
     (second (divide (scale lcv**e u) v))))
 
-(defn univariate-content
+(defn ^:private univariate-content
   [^Polynomial p]
   {:pre [(= (.arity p) 1)]}
   (if (polynomial-zero? p) p
@@ -423,41 +423,12 @@
     (if (polynomial-zero? v) (list u)
         (lazy-seq (cons u (step v (remainder u v)))))))
 
-(defn evenly-divide
-  "Divides the polynomial u by the polynomial v. Throws an IllegalStateException
-  if the division leaves a remainder. Otherwise returns the quotient."
-  [u v]
-  {:pre [(instance? Polynomial u)
-         (instance? Polynomial v)]}
-  (let [[q r] (divide u v)]
-    (when-not (polynomial-zero? r)
-      (throw (IllegalStateException. (str "expected even division left a remainder!" u " / " v " r " r))))
-    q))
-
-(defn abs
+(defn ^:private abs
   [^Polynomial p]
   (let [R (.ring p)]
     (if (a/cmp R p (a/additive-identity R))
       (polynomial-negate p)
       p)))
-
-(defn expt
-  "Raise the polynomial p to the (integer) power n. Note: Zippel suggests
-  this algorithm may not be a win for polynomials. Research that."
-  [^Polynomial p n]
-  (when-not (and (integer? n) (>= n 0))
-    (throw (ArithmeticException.
-            (str "can't raise poly to " n))))
-  (cond (polynomial-one? p) p
-        (polynomial-zero? p) (if (zero? n)
-                               (throw (ArithmeticException. "poly 0^0"))
-                               p)
-        (zero? n) (polynomial-one-like p)
-        :else (loop [x p c n a (polynomial-one-like p)]
-                (if (zero? c) a
-                    (if (even? c)
-                      (recur (mul x x) (quot c 2) a)
-                      (recur x (dec c) (mul x a)))))))
 
 (defn evaluate
   [^Polynomial p xs]
