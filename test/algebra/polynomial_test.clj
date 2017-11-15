@@ -13,6 +13,9 @@
            (algebra Ring Field)))
 
 (def ^:private Rx (PolynomialRing a/NativeArithmetic 1))
+(def ^:private Rxy (PolynomialRing a/NativeArithmetic 2))
+(def ^:private Rxyz (PolynomialRing a/NativeArithmetic 3))
+(def ^:private RRx (PolynomialRing Rx 1))
 (def ^:private P #(make-unary Rx %&))
 
 (deftest poly-core
@@ -20,18 +23,17 @@
     (is (a/additive-identity? Rx (P)))
     (is (a/additive-identity? Rx (P 0)))
     (is (a/additive-identity? Rx (P)))
-    (is (a/additive-identity? Rx (make Rx 2 [])))
-    (is (a/additive-identity? Rx (make Rx 2 [])))
+    (is (a/additive-identity? Rxy (make Rxy [])))
     (is (not (a/additive-identity? Rx (P 1)))))
   (testing "unity"
     (is (a/multiplicative-identity? Rx (P 1)))
-    (is (a/multiplicative-identity? Rx (make 2 [[[0 0] 1]])))
-    (is (a/multiplicative-identity? Rx (make 3 [[[0 0 0] 1]])))
-    (is (not (a/multiplicative-identity? Rx (make 3 [[[0 0 0] 1] [[0 0 1] 2]]))))
+    (is (a/multiplicative-identity? Rxy (make Rxy [[[0 0] 1]])))
+    (is (a/multiplicative-identity? Rxyz (make Rxyz [[[0 0 0] 1]])))
+    (is (not (a/multiplicative-identity? Rx (make Rxyz [[[0 0 0] 1] [[0 0 1] 2]]))))
     (is (not (a/multiplicative-identity? Rx (P 1.1))))
     (is (not (a/multiplicative-identity? Rx (P 1.0))))               ;; though maybe it should be
-    (is (a/multiplicative-identity? Rx (make (PolynomialRing a/NativeArithmetic 1) 1 [[[0] (P 1)]])))
-    (is (not (a/multiplicative-identity? Rx (make (PolynomialRing a/NativeArithmetic 1) 1 [[[0] (P 2)]])))))
+    (is (a/multiplicative-identity? RRx (make RRx [[[0] (P 1)]])))
+    (is (not (a/multiplicative-identity? RRx (make RRx [[[0] (P 2)]])))))
   (testing "degree"
     (is (= (degree (P)) -1))
     (is (= (degree (P -1 1)) 1))
@@ -53,7 +55,7 @@
     (is (= (P -2 -2 -1) (a/subtract Rx (P 1) (P 3 2 1))))
     (is (= (P 0 0 1 0 1 -1) (a/subtract Rx (P 1 0 1 0 1) (P 1 0 0 0 0 1))))
     (is (= (P 0 0 -1 0 -1 1) (a/subtract Rx (P 1 0 0 0 0 1) (P 1 0 1 0 1))))
-    (is (= (P -1 -2 -3) (polynomial-negate (P 1 2 3)))))
+    (is (= (P -1 -2 -3) (a/negate Rx (P 1 2 3)))))
   (testing "mul"
     (is (= (P) (a/mul Rx (P 1 2 3) (P 0))))
     (is (= (P) (a/mul Rx (P 0) (P 1 2 3))))
@@ -88,8 +90,8 @@
     (let [p (P 3 0 4)
           q (P 2 2)]
       (is (= (P 28) (zippel-pseudo-remainder p q))))
-    (is (= [(make 2 []) (make 2 [[[2 1] 1] [[1 2] 1]])]
-           (a/quorem Rx (make 2 [[[2 1] 1] [[1 2] 1]]) (make 2 [[[1 2] 1]]))))
+    (is (= [(make Rxy []) (make Rxy [[[2 1] 1] [[1 2] 1]])]
+           (a/quorem Rxy (make Rxy [[[2 1] 1] [[1 2] 1]]) (make Rxy [[[1 2] 1]]))))
     (is (= [(P 1) (P)] (a/quorem Rx (P 3) (P 3))))
     (is (= (P 0) (zippel-pseudo-remainder (P 7) (P 2)))))
   (testing "expt"
@@ -115,20 +117,20 @@
                   (mul [this x y] (mod (* x y) n))))
           Z2 (Zmod 2)
           Z2x (PolynomialRing Z2 1)
-          P (make Z2 1 [[[2] 1] [[0] 1]])]
-      (is (= (make Z2 1 [[[4] 1] [[0] 1]]) (a/exponentiation-by-squaring Rx P 2)))
-      (is (= (make Z2 1 [[[6] 1] [[4] 1] [[2] 1] [[0] 1]]) (a/exponentiation-by-squaring Rx P 3)))
-      (is (= (make Z2 1 [[[8] 1] [[0] 1]]) (a/mul Rx (a/exponentiation-by-squaring Rx P 3) P)))
-      (is (= (make Z2 1 []) (a/subtract Rx P P)))
-      (is (= (make Z2 1 []) (a/add Rx P P)))
-      (is (= (make Z2 1 [[[2] 1]]) (a/add Rx P (a/multiplicative-identity Z2x))))
+          P (make-unary Z2x [1 0 1])]
+      (is (= (make Z2x [[[4] 1] [[0] 1]]) (a/exponentiation-by-squaring Rx P 2)))
+      (is (= (make Z2x [[[6] 1] [[4] 1] [[2] 1] [[0] 1]]) (a/exponentiation-by-squaring Rx P 3)))
+      (is (= (make Z2x [[[8] 1] [[0] 1]]) (a/mul Rx (a/exponentiation-by-squaring Rx P 3) P)))
+      (is (= (make Z2x []) (a/subtract Rx P P)))
+      (is (= (make Z2x []) (a/add Rx P P)))
+      (is (= (make Z2x [[[2] 1]]) (a/add Rx P (a/multiplicative-identity Z2x))))
       (testing "CRC polynomials"
         ;; https://en.wikipedia.org/wiki/Computation_of_cyclic_redundancy_checks
         ;; http://www.lammertbies.nl/comm/info/crc-calculation.html
         (let [Z2x (PolynomialRing Z2 1)
               p+p (partial a/add Z2x)
-              x (make Z2 1 [[[1] 1]])
-              unit (make Z2 1 [[[0] 1]])
+              x (make-unary Z2x [0 1])
+              unit (make-unary Z2x [1])
               x8 (a/exponentiation-by-squaring Z2x x 8)
               CRC-8-ATM (reduce p+p [unit
                                      x
@@ -229,18 +231,18 @@
 
 (deftest poly-partial-derivatives
   (let [V (P 1 2 3 4)
-        U (make 2 [[[1 1] 3] [[2 2] 4] [[0 0] 5] [[0 3] 7] [[4 0] -2]])]
+        U (make Rxy [[[1 1] 3] [[2 2] 4] [[0 0] 5] [[0 3] 7] [[4 0] -2]])]
     (is (= (P 2 6 12) (partial-derivative V 0)))
     (is (= [(P 2 6 12)] (partial-derivatives V)))
-    (is (= (make 2 [[[0 1] 3] [[1 2] 8] [[3 0] -8]]) (partial-derivative U 0)))
-    (is (= (make 2 [[[1 0] 3] [[2 1] 8] [[0 2] 21]]) (partial-derivative U 1)))
-    (is (= [(make 2 [[[0 1] 3] [[1 2] 8] [[3 0] -8]])
-            (make 2 [[[1 0] 3] [[2 1] 8] [[0 2] 21]])]
+    (is (= (make Rxy [[[0 1] 3] [[1 2] 8] [[3 0] -8]]) (partial-derivative U 0)))
+    (is (= (make Rxy [[[1 0] 3] [[2 1] 8] [[0 2] 21]]) (partial-derivative U 1)))
+    (is (= [(make Rxy [[[0 1] 3] [[1 2] 8] [[3 0] -8]])
+            (make Rxy [[[1 0] 3] [[2 1] 8] [[0 2] 21]])]
            (partial-derivatives U)))))
 
 (defn generate-poly
   [arity]
-  (gen/fmap #(make arity %)
+  (gen/fmap #(make (PolynomialRing a/NativeArithmetic arity) %)
             (gen/vector
              (gen/tuple
               (gen/vector gen/pos-int arity)
@@ -256,16 +258,17 @@
   (gen/let [arity (gen/choose 1 10)]
     (prop/for-all [p (generate-poly arity)
                    q (generate-poly arity)]
-                  (= (a/add Rx p q) (make (.arity p) (concat (.terms p) (.terms q)))))))
+                  (= (a/add Rx p q) (make (PolynomialRing a/NativeArithmetic (.arity p))
+                                          (concat (.terms p) (.terms q)))))))
 
 (defspec rp+sp=_r+s_p
-  (prop/for-all [[R p r s] (gen/bind gen/nat #(gen/tuple
-                                               (gen/return (PolynomialRing a/NativeArithmetic %))
-                                               (generate-poly %)
-                                               gen/ratio
-                                               gen/ratio))]
-                (= (a/add R (a/scale R r p) (a/scale R s p))
-                   (a/scale R (+ r s) p))))
+  (prop/for-all [[p r s] (gen/bind gen/nat #(gen/tuple
+                                             (generate-poly %)
+                                             gen/ratio
+                                             gen/ratio))]
+                (let [R (PolynomialRing a/NativeArithmetic (:arity p))]
+                  (= (a/add R (a/scale R r p) (a/scale R s p))
+                     (a/scale R (+ r s) p)))))
 
 (defspec p-p=0
   (prop/for-all [p (gen/bind gen/nat generate-poly)]

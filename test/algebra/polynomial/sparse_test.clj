@@ -41,14 +41,15 @@
   (is (= [::ps/pow 2 1 0] (->shnf (p/make-unary Rx [0 0 1]))))
   (is (= [::ps/pow 1 [::ps/pow 1 1 1] 0] (->shnf (p/make-unary Rx [0 1 1]))))
   (is (= [::ps/pow 1 [::ps/pow 1 1 1] 1] (->shnf (p/make-unary Rx [1 1 1]))))
-  (let [[k x y z] (p/basis a/NativeArithmetic 3)
-        R (p/make a/NativeArithmetic 3 [[[4 2 0] 4]
-                                        [[3 0 0] 3]
-                                        [[0 0 4] 2]
-                                        [[0 0 0] 5]])
-        Rx (->shnf R)]
-    (is (= [::ps/pow 3 [::ps/pow 1 [::ps/pop 1 [::ps/pow 2 4 0]] 3] [::ps/pop 1 [::ps/pow 4 2 5]]] Rx))
-    (is (= 186 (shnf-eval a/NativeArithmetic Rx [1 2 3])))))
+  (let [Rxyz (p/PolynomialRing a/NativeArithmetic 3)
+        [k x y z] (p/basis Rxyz)
+        p (p/make Rxyz [[[4 2 0] 4]
+                        [[3 0 0] 3]
+                        [[0 0 4] 2]
+                        [[0 0 0] 5]])
+        ps (->shnf p)]
+    (is (= [::ps/pow 3 [::ps/pow 1 [::ps/pop 1 [::ps/pow 2 4 0]] 3] [::ps/pop 1 [::ps/pow 4 2 5]]] ps))
+    (is (= 186 (shnf-eval a/NativeArithmetic ps [1 2 3])))))
 
 (defn generate-poly
   ([generator]
@@ -57,7 +58,7 @@
      (fn [arity]
        (generate-poly generator arity))))
   ([generator arity]
-   (gen/fmap #(p/make arity %)
+   (gen/fmap #(p/make (p/PolynomialRing a/NativeArithmetic arity) %)
              (gen/vector
                (gen/tuple
                  (gen/vector gen/pos-int arity)

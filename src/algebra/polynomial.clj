@@ -61,11 +61,15 @@
 ;;
 
 (defprotocol IPolynomial
+  (degree [this])
   (coef [this exponents])
   (evaluate [this args]))
 
-(deftype Polynomial [ring arity terms]
+(defrecord Polynomial [ring arity terms]
   IPolynomial
+  (degree [this]
+    (if (empty? terms) -1
+        (reduce + (exponents (peek terms)))))
   (coef [_ exponents]
     (if-let [s (seq (drop-while #(not= exponents (first %)) terms))]
       (second (first s))
@@ -73,26 +77,7 @@
   (evaluate [_ args]
     (reduce (partial a/add ring) (a/additive-identity ring)
             (for [[es c] terms]
-              (reduce (partial a/mul ring) c (map #(a/exponentiation-by-squaring ring %1 %2) args es)))))
-  Object
-  (equals [_ b]
-    (and (instance? Polynomial b)
-         (let [^Polynomial bp b]
-           (and (= arity (.arity bp))
-                (= terms (.terms bp))))))
-  (toString [_]
-    (let [n 10
-          c (count terms)]
-      (str "("
-           ring
-           " #"
-           arity
-           " "
-           (string/join ";"
-                        (take n (for [[k v] terms]
-                                  (str v "*" (clojure.string/join "," k)))))
-           (if (> c n) (format " ...and %d more terms" (- c n)))
-           ")"))))
+              (reduce (partial a/mul ring) c (map #(a/exponentiation-by-squaring ring %1 %2) args es))))))
 
 (defn ^:private polynomial-zero? [^Polynomial p] (empty? (.terms p)))
 (defn ^:private polynomial-one?
@@ -105,7 +90,7 @@
         (and (every? zero? xs)
              (a/multiplicative-identity? R c))))))
 
-(defn make
+(defn ^:private make-polynomial
   "When called with two arguments, the first is the arity
   (number of indeterminates) of the polynomial followed by a sequence
   of exponent-coefficient pairs. Each exponent should be a vector with
@@ -118,17 +103,15 @@
   dense sequence of coefficients of an arity-1 (univariate)
   polynomial. The coefficients begin with the constant term and
   proceed to each higher power of the indeterminate. For example, x^2
-  - 1 can be constructed by (make -1 0 1)."
-  ([ring arity xc-pairs]
-   (Polynomial. ring arity
+  - 1 can be constructed by (make-polynomial -1 0 1)."
+  [ring arity xc-pairs]
+  (->Polynomial ring arity
                 (->> (for [[xs cs] (group-by exponents xc-pairs)
                            :let [sum-cs (reduce #(a/add ring %1 (coefficient %2)) (a/additive-identity ring) cs)]
                            :when (not (a/additive-identity? ring sum-cs))]
                        [xs sum-cs])
                      (sort-by exponents monomial-order)
                      (into empty-coefficients))))
-  ([arity xc-pairs]
-   (make a/NativeArithmetic arity xc-pairs)))
 
 (defn ^:private lead-term
   "Return the leading (i.e., highest degree) term of the polynomial
@@ -136,43 +119,38 @@
   [^Polynomial p]
   (-> p .terms peek))
 
-(defn degree
-  [p]
-  (if (polynomial-zero? p) -1
-      (->> p lead-term exponents (reduce +))))
-
 (defn coefficients
   [^Polynomial p]
   (->> p .terms (map coefficient)))
 
-(defn compatible-ring
+(defn ^:private compatible-ring
   [^Polynomial p ^Polynomial q]
   (assert (and (= (.arity p) (.arity q))
                (= (.ring p) (.ring q))))
   (.ring p))
 
-(defn compatible-constructor
+(defn ^:private compatible-constructor
   [^Polynomial p ^Polynomial q]
   (assert (and (= (.arity p) (.arity q))
                (= (.ring p) (.ring q))))
-  (fn [xs->c] (make (.ring p) (.arity p) xs->c)))
+  (fn [xs->c] (make-polynomial (.ring p) (.arity p) xs->c)))
 
-(defn map-coefficients
+(defn ^:private map-coefficients
   "Map the function f over the coefficients of p, returning a new Polynomial."
   [f ^Polynomial p]
   (let [R (.ring p)]
-    (Polynomial. R (.arity p) (into empty-coefficients
-                                    (for [[xs c] (.terms p)
-                                          :let [fc (f c)]
-                                          :when (not (a/additive-identity? R fc))]
-                                      [xs fc])))))
+    (->Polynomial R (.arity p) (into empty-coefficients
+                                     (for [[xs c] (.terms p)
+                                           :let [fc (f c)]
+                                           :when (not (a/additive-identity? R fc))]
+                                       [xs fc])))))
 
-(defn polynomial-negate
+(defn ^:private polynomial-negate
   [^Polynomial p]
   (let [R (.ring p)]
     (map-coefficients #(a/negate R %) p)))
 
-(defn basis
+(defn ^:private polynomial-basis
   [ring arity]
   (cons (->Polynomial ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity ring)]])
         (for [i (range arity)]
@@ -290,7 +268,9 @@
                       [quotient remainder]))))))
 
 (defprotocol IPolynomialConstructor
-  (make-unary [this dense-coefficients]))
+  (basis [this])
+  (make-unary [this dense-coefficients])
+  (make [this xc-pairs]))
 
 (defmacro ^:private reify-polynomial-ring
   [coefficient-ring arity euclidean?]
@@ -315,8 +295,10 @@
      a/Module
      (scale [_ r# p#] (scale r# p#))
      IPolynomialConstructor
+     (basis [_] (polynomial-basis ~coefficient-ring ~arity))
      (make-unary [_ dense-coefficients#]
-       (make ~coefficient-ring 1 (map #(vector [%1] %2) (range) dense-coefficients#)))
+       (make-polynomial ~coefficient-ring 1 (map #(vector [%1] %2) (range) dense-coefficients#)))
+     (make [_ xc-pairs#] (make-polynomial ~coefficient-ring ~arity xc-pairs#))
      Object
      (toString [_] (format "%s[%dv]" ~coefficient-ring ~arity))))
 
@@ -435,12 +417,12 @@
   i-th indeterminate."
   [^Polynomial p i]
   (let [R (.ring p)]
-    (make (.ring p)
-          (.arity p)
-          (for [[xs c] (.terms p)
-                :let [xi (xs i)]
-                :when (not= 0 xi)]
-            [(update xs i dec) (a/mul R xi c)]))))
+    (make-polynomial (.ring p)
+                     (.arity p)
+                     (for [[xs c] (.terms p)
+                           :let [xi (xs i)]
+                           :when (not= 0 xi)]
+                       [(update xs i dec) (a/mul R xi c)]))))
 
 (defn partial-derivatives
   "The sequence of partial derivatives of p with respect to each
