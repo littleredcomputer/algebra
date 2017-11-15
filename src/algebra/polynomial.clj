@@ -166,6 +166,12 @@
   (let [R (.ring p)]
     (map-coefficients #(a/negate R %) p)))
 
+(defn coef
+  [^Polynomial p xs]
+  (if-let [s (seq (drop-while #(not= xs (first %)) (.terms p)))]
+    (second (first s))
+    (a/additive-identity (.ring p))))
+
 (defn basis
   [ring arity]
   (cons (->Polynomial ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity ring)]])
@@ -254,28 +260,6 @@
                         (if (not= k 0) k (recur (next pterms) (next qterms))))
                       mo))))))
 
-(defn PolynomialRing
-  [coefficient-ring arity]
-  (reify
-    a/Ring
-    (member? [this p] (instance? Polynomial p))
-    (additive-identity [this] (->Polynomial coefficient-ring arity []))
-    (additive-identity? [this p] (polynomial-zero? p))
-    (multiplicative-identity [this] (->Polynomial coefficient-ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity coefficient-ring)]]))
-    (multiplicative-identity? [this p] (polynomial-one? p))
-    (add [this p q] (add p q))
-    (subtract [this p q] (sub p q))
-    (negate [this p] (polynomial-negate p))
-    (mul [this p q]
-      (if (and (a/member? coefficient-ring p)
-               (a/member? this q))
-        (scale p q)
-        (mul p q)))
-    a/Ordered
-    (cmp [this p q] (polynomial-order p q))
-    Object
-    (toString [this] (format "%s[%dv]" coefficient-ring arity))))
-
 (defn divide
   "Divide polynomial u by v, and return the pair of [quotient, remainder]
   polynomials. This assumes that the coefficients are drawn from a field,
@@ -304,6 +288,47 @@
                         (recur (add quotient new-term)
                                (sub remainder (mul new-term v))))
                       [quotient remainder]))))))
+
+(defn PolynomialRing
+  [coefficient-ring arity]
+  (if (= arity 1)
+    (reify
+      a/Ring
+      (member? [this p] (instance? Polynomial p))
+      (additive-identity [this] (->Polynomial coefficient-ring arity []))
+      (additive-identity? [this p] (polynomial-zero? p))
+      (multiplicative-identity [this] (->Polynomial coefficient-ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity coefficient-ring)]]))
+      (multiplicative-identity? [this p] (polynomial-one? p))
+      (add [this p q] (add p q))
+      (subtract [this p q] (sub p q))
+      (negate [this p] (polynomial-negate p))
+      (mul [this p q] (mul p q))
+      a/Euclidean
+      (quorem [this p q] (divide p q))
+      a/Ordered
+      (cmp [this p q] (polynomial-order p q))
+      a/Module
+      (scale [this p r] (scale p r))
+      Object
+      (toString [this] (format "%s[%dv]" coefficient-ring arity)))
+    ;; arity ≠ 1, so we don't support the Euclidean interface
+    (reify
+      a/Ring
+      (member? [this p] (instance? Polynomial p))
+      (additive-identity [this] (->Polynomial coefficient-ring arity []))
+      (additive-identity? [this p] (polynomial-zero? p))
+      (multiplicative-identity [this] (->Polynomial coefficient-ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity coefficient-ring)]]))
+      (multiplicative-identity? [this p] (polynomial-one? p))
+      (add [this p q] (add p q))
+      (subtract [this p q] (sub p q))
+      (negate [this p] (polynomial-negate p))
+      (mul [this p q] (mul p q))
+      a/Ordered
+      (cmp [this p q] (polynomial-order p q))
+      a/Module
+      (scale [this p r] (scale p r))
+      Object
+      (toString [this] (format "%s[%dv]" coefficient-ring arity)))))
 
 (defn zippel-pseudo-remainder
   "The algorithm PolyPseudoRemainder from Zippel, p.132"
@@ -359,41 +384,38 @@
   {:pre [(= (.arity p) 1)]}
   (let [R (.ring p)
         g (univariate-content p)]
-    (map-coefficients #(a/quotient R % g) p)))
+    (map-coefficients #(a/exact-quotient R % g) p)))
 
 (defn subresultant-polynomial-remainder-sequence
-  [pseudo-remainderer]
-  (fn [^Polynomial u ^Polynomial v]
-    (assert (= (.arity u) (.arity v) 1))
-    (let [R (compatible-ring u v)
-          one (a/multiplicative-identity R)
-          minus-one (a/negate R one)
-          δ0 (- (degree u) (degree v))
-          ψ0 (if (even? δ0) minus-one one)]
-      (defn step [prr pr δr ψ β]
-        (let [p (map-coefficients #(a/quotient R % β) (pseudo-remainderer prr pr))
-              a (coefficient (lead-term pr))
-              ψ (if (zero? δr)
-                  ψ ; Avoid negative exponent
-                  (a/quotient R (a/exponentiation-by-squaring R a δr)
-                              (a/exponentiation-by-squaring R ψ (dec δr))))
-              δ (- (degree pr) (degree p))
-              β (a/mul R (if (even? δ) minus-one one) (a/mul R (a/exponentiation-by-squaring R ψ δ) a))]
-          (if (polynomial-zero? p)
-            nil
-            (cons p (lazy-seq (step pr p δ ψ β))))))
-      (lazy-seq (cons u (cons v (if (< δ0 0)
-                                  (step v u (- δ0) one ψ0)
-                                  (step u v δ0 one ψ0))))))))
-
-(def ^:private zippel-srs (subresultant-polynomial-remainder-sequence zippel-pseudo-remainder))
+  [^Polynomial u ^Polynomial v]
+  (assert (= (.arity u) (.arity v) 1))
+  (let [R (compatible-ring u v)
+        one (a/multiplicative-identity R)
+        minus-one (a/negate R one)
+        δ0 (- (degree u) (degree v))
+        ψ0 (if (even? δ0) minus-one one)]
+    (defn step [prr pr δr ψ β]
+      (let [p (map-coefficients #(a/exact-quotient R % β) (classic-pseudo-remainder prr pr))
+            a (coefficient (lead-term pr))
+            ψ (if (zero? δr)
+                ψ ; Avoid negative exponent
+                (a/exact-quotient R (a/exponentiation-by-squaring R a δr)
+                                  (a/exponentiation-by-squaring R ψ (dec δr))))
+            δ (- (degree pr) (degree p))
+            β (a/mul R (if (even? δ) minus-one one) (a/mul R (a/exponentiation-by-squaring R ψ δ) a))]
+        (if (polynomial-zero? p)
+          nil
+          (cons p (lazy-seq (step pr p δ ψ β))))))
+    (lazy-seq (cons u (cons v (if (< δ0 0)
+                                (step v u (- δ0) one ψ0)
+                                (step u v δ0 one ψ0)))))))
 
 (defn univariate-subresultant-gcd
   [u v]
   (let [R (compatible-ring u v)
         prs (if (> (degree u) (degree v))
-              (zippel-srs u v)
-              (zippel-srs v u))
+              (subresultant-polynomial-remainder-sequence u v)
+              (subresultant-polynomial-remainder-sequence v u))
         g (last prs)]
     (if (zero? (degree g))
       (->Polynomial R 1 (conj empty-coefficients [[0] (a/multiplicative-identity R)]))

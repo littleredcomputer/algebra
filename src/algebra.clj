@@ -16,11 +16,14 @@
   )
 
 (defprotocol Euclidean
-  (quotient [this x y])
-  (remainder [this x y]))
+  (quorem [this x y]))
 
 (defprotocol Field
   (divide [this x y]))
+
+;; A module defines scalar multiplication (here, on the right)
+(defprotocol Module
+  (scale [this x r]))
 
 (def NativeArithmetic
   "The 'ring' of Clojure's native arithmetic (overflow-safe) operators."
@@ -36,8 +39,7 @@
     (negate [this x] (-' x))
     (mul [this x y] (*' x y))
     Euclidean
-    (quotient [this x y] (quot x y))
-    (remainder [this x y] (rem x y))
+    (quorem [this x y] [(quot x y) (rem x y)])
     Ordered
     (cmp [this x y] (compare x y))
     Field
@@ -59,17 +61,23 @@
 
 (defn evenly-divides?
   [R u v]
-  (additive-identity? R (remainder R v u)))
+  (additive-identity? R (second (quorem R v u))))
 
-(defn extended-euclid-algorithm
+(defn reciprocal
+  [R x]
+  (divide R (multiplicative-identity R) x))
+
+(defn exact-quotient
   [R u v]
-  )
+  (let [[q r] (quorem R u v)]
+    (assert (additive-identity? R r) (str "exact-quotient: " u " ÷ " v))
+    q))
 
 (defn euclid-gcd
   [R u v]
   (let [step (fn [u v]
                (if (additive-identity? R v) u
-                   (recur v (remainder R u v))))]
+                   (recur v (second (quorem R u v)))))]
     (step u v)))
 
 (defn euclid-gcd-seq
