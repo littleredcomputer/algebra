@@ -267,7 +267,7 @@
   (make [this xc-pairs]))
 
 (defmacro ^:private reify-polynomial-ring
-  [coefficient-ring arity euclidean?]
+  [coefficient-ring arity & {:keys [euclidean]}]
   `(reify
      a/Ring
      (member? [_ p#] (instance? Polynomial p#))
@@ -281,7 +281,7 @@
      (subtract [_ p# q#] (sub p# q#))
      (negate [_ p#] (polynomial-negate p#))
      (mul [_ p# q#] (mul p# q#))
-     ~@(if euclidean?
+     ~@(if euclidean
          `(a/Euclidean
            (quorem [_ p# q#] (divide p# q#))))
      a/Ordered
@@ -298,7 +298,9 @@
 
 (defn PolynomialRing
   [coefficient-ring arity]
-  (reify-polynomial-ring coefficient-ring arity (= arity 1)))
+  (if (= arity 1)
+    (reify-polynomial-ring coefficient-ring arity :euclidean true)
+    (reify-polynomial-ring coefficient-ring arity)))
 
 (defn zippel-pseudo-remainder
   "The algorithm PolyPseudoRemainder from Zippel, p.132"

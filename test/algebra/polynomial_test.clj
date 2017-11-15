@@ -90,8 +90,9 @@
     (let [p (P 3 0 4)
           q (P 2 2)]
       (is (= (P 28) (zippel-pseudo-remainder p q))))
-    (is (= [(make Rxy []) (make Rxy [[[2 1] 1] [[1 2] 1]])]
-           (a/quorem Rxy (make Rxy [[[2 1] 1] [[1 2] 1]]) (make Rxy [[[1 2] 1]]))))
+    ;; Multivariate polynomial rings are not Euclidean.
+    (is (thrown-with-msg? IllegalArgumentException #"No implementation.*Euclidean"
+                          (a/quorem Rxy (make Rxy [[[2 1] 1] [[1 2] 1]]) (make Rxy [[[1 2] 1]]))))
     (is (= [(P 1) (P)] (a/quorem Rx (P 3) (P 3))))
     (is (= (P 0) (zippel-pseudo-remainder (P 7) (P 2)))))
   (testing "expt"
