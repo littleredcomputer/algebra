@@ -91,19 +91,13 @@
              (a/multiplicative-identity? R c))))))
 
 (defn ^:private make-polynomial
-  "When called with two arguments, the first is the arity
-  (number of indeterminates) of the polynomial followed by a sequence
+  "Constructs a polynomial with coefficients in `ring` with the given
+  `arity` (number of indeterminates), followed by a sequence
   of exponent-coefficient pairs. Each exponent should be a vector with
-  length equal to the arity, with integer exponent values. To
+  length equal to the arity, with non-negative integer exponent values. To
   make 4 x^2 y + 5 x y^2, an arity 2 polynomial (since it has two
   variables, x and y), we could write the following for xc-pairs:
-  [[[2 1] 4] [[1 2] 5]]
-
-  When called with one argument, the sequence is interpreted as a
-  dense sequence of coefficients of an arity-1 (univariate)
-  polynomial. The coefficients begin with the constant term and
-  proceed to each higher power of the indeterminate. For example, x^2
-  - 1 can be constructed by (make-polynomial -1 0 1)."
+  [[[2 1] 4] [[1 2] 5]]."
   [ring arity xc-pairs]
   (->Polynomial ring arity
                 (->> (for [[xs cs] (group-by exponents xc-pairs)

@@ -127,8 +127,7 @@
       (testing "CRC polynomials"
         ;; https://en.wikipedia.org/wiki/Computation_of_cyclic_redundancy_checks
         ;; http://www.lammertbies.nl/comm/info/crc-calculation.html
-        (let [Z2x (PolynomialRing Z2 1)
-              p+p (partial a/add Z2x)
+        (let [p+p (partial a/add Z2x)
               x (make-unary Z2x [0 1])
               unit (make-unary Z2x [1])
               x8 (a/exponentiation-by-squaring Z2x x 8)
@@ -203,20 +202,19 @@
              (subresultant-polynomial-remainder-sequence (P 1) (P 1))))))
 
   (testing "polynomial order"
-    (let [Rx (PolynomialRing a/NativeArithmetic 1)]
-      (is (= 1 (a/cmp Rx (P 2 1 1) (P 2 1))))
-      (is (= -1 (a/cmp Rx (P 2 1) (P 2 1 1))))
-      (is (= -1 (a/cmp Rx (P 3 2 1) (P 4 2 1))))
-      (is (= 1 (a/cmp Rx (P 4 2 1) (P 3 2 1))))
-      (is (= 0 (a/cmp Rx (P 4 2 1) (P 4 2 1))))
-      (is (= -1 (a/cmp Rx (P 1 0 0 1 0 0) (P 1 0 0 0 1 0))))
-      (is (= 1 (a/cmp Rx (P 1 0 0 0 1 0) (P 1 0 0 1 0 0))))
-      (is (= 1 (a/cmp Rx (P 1 0 0 2 0 0) (P 1 0 0 1 0 0))))
-      (is (= -1 (a/cmp Rx (P 1 0 0 1 0 0) (P 1 0 0 2 0 0))))))
+    (is (= 1 (a/cmp Rx (P 2 1 1) (P 2 1))))
+    (is (= -1 (a/cmp Rx (P 2 1) (P 2 1 1))))
+    (is (= -1 (a/cmp Rx (P 3 2 1) (P 4 2 1))))
+    (is (= 1 (a/cmp Rx (P 4 2 1) (P 3 2 1))))
+    (is (= 0 (a/cmp Rx (P 4 2 1) (P 4 2 1))))
+    (is (= -1 (a/cmp Rx (P 1 0 0 1 0 0) (P 1 0 0 0 1 0))))
+    (is (= 1 (a/cmp Rx (P 1 0 0 0 1 0) (P 1 0 0 1 0 0))))
+    (is (= 1 (a/cmp Rx (P 1 0 0 2 0 0) (P 1 0 0 1 0 0))))
+    (is (= -1 (a/cmp Rx (P 1 0 0 1 0 0) (P 1 0 0 2 0 0)))))
 
   (testing "scalar multiplication"
-    (let [Rx (PolynomialRing a/NativeArithmetic 1)]
-      (is (= (P 3 6 9) (a/scale Rx 3 (P 1 2 3))))))
+    (is (= (P 3 6 9) (a/scale Rx 3 (P 1 2 3))))
+    (is (= (P) (a/scale Rx 0 (P 1 2 3)))))
 
   (testing "monomial order"
     (let [x3 [3 0 0]
@@ -323,13 +321,12 @@
 
 (defn ^:private test-univariate-polynomial-gcd-with
   [gcd-er]
-  (let [Rx (PolynomialRing a/NativeArithmetic 1)]
-    (fn [test-case]
-      (let [[u v k] (map make-polynomial-from-ints test-case)
-           g (gcd-er u v)]
-        (and (a/evenly-divides? Rx g u)
-             (a/evenly-divides? Rx g v)
-             (a/evenly-divides? Rx k g))))))
+  (fn [test-case]
+    (let [[u v k] (map make-polynomial-from-ints test-case)
+          g (gcd-er u v)]
+      (and (a/evenly-divides? Rx g u)
+           (a/evenly-divides? Rx g v)
+           (a/evenly-divides? Rx k g)))))
 
 
 (defspec test-univariate-subresultant-gcd
