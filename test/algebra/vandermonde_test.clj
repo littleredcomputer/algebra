@@ -12,15 +12,15 @@
 (def gen-vandermonde-test-case
   (gen/bind (gen/fmap inc gen/nat)
             #(gen/tuple
-              (gen/such-that
-               (fn [v] (= (count v) (count (distinct v))))
-               (gen/vector gen/ratio %))
+              (gen/vector-distinct gen/ratio {:num-elements %})
               (gen/vector gen/ratio %))))
 
-(defspec vandermonde-solution
+(def ^:private Rx (p/PolynomialRing a/NativeArithmetic 1))
+
+(defspec vandermonde-solution 25
   (prop/for-all [[ks ws] gen-vandermonde-test-case]
                 ;; The vandermonde solver computes a vector of polynomial
                 ;; coefficients. The polynomial built from those coefficients
                 ;; should map corresponding ks to ws
-                (let [p (p/make (solve a/NativeArithmetic ks ws))]
+                (let [p (p/make-unary Rx (solve a/NativeArithmetic ks ws))]
                   (every? true? (map #(= (p/evaluate p [%1]) %2) ks ws)))))

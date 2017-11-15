@@ -21,9 +21,9 @@
 (defprotocol Field
   (divide [this x y]))
 
-;; A module defines scalar multiplication (here, on the right)
+;; A module defines scalar multiplication (here, on the left)
 (defprotocol Module
-  (scale [this x r]))
+  (scale [this r x]))
 
 (def NativeArithmetic
   "The 'ring' of Clojure's native arithmetic (overflow-safe) operators."

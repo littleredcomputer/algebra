@@ -60,7 +60,20 @@
 ;; Polynomials
 ;;
 
+(defprotocol IPolynomial
+  (coef [this exponents])
+  (evaluate [this args]))
+
 (deftype Polynomial [ring arity terms]
+  IPolynomial
+  (coef [_ exponents]
+    (if-let [s (seq (drop-while #(not= exponents (first %)) terms))]
+      (second (first s))
+      (a/additive-identity ring)))
+  (evaluate [_ args]
+    (reduce (partial a/add ring) (a/additive-identity ring)
+            (for [[es c] terms]
+              (reduce (partial a/mul ring) c (map #(a/exponentiation-by-squaring ring %1 %2) args es)))))
   Object
   (equals [_ b]
     (and (instance? Polynomial b)
@@ -81,8 +94,8 @@
            (if (> c n) (format " ...and %d more terms" (- c n)))
            ")"))))
 
-(defn polynomial-zero? [^Polynomial p] (empty? (.terms p)))
-(defn polynomial-one?
+(defn ^:private polynomial-zero? [^Polynomial p] (empty? (.terms p)))
+(defn ^:private polynomial-one?
   "True if p has only a constant term which is equal to the multiplicative identity in its base ring"
   [^Polynomial p]
   (let [R (.ring p)
@@ -91,11 +104,6 @@
       (let [[xs c] (first (.terms p))]
         (and (every? zero? xs)
              (a/multiplicative-identity? R c))))))
-(defn polynomial-zero-like [^Polynomial p] (->Polynomial (.ring p) (.arity p) empty-coefficients))
-(defn polynomial-one-like [^Polynomial p]
-  (let [R (.ring p)
-        a (.arity p)]
-    (->Polynomial R a [[(vec (repeat a 0)) (a/multiplicative-identity R)]])))
 
 (defn make
   "When called with two arguments, the first is the arity
@@ -120,9 +128,7 @@
                      (sort-by exponents monomial-order)
                      (into empty-coefficients))))
   ([arity xc-pairs]
-   (make a/NativeArithmetic arity xc-pairs))
-  ([dense-coefficients]
-   (make 1 (zipmap (map vector (iterate inc 0)) dense-coefficients))))
+   (make a/NativeArithmetic arity xc-pairs)))
 
 (defn ^:private lead-term
   "Return the leading (i.e., highest degree) term of the polynomial
@@ -166,12 +172,6 @@
   (let [R (.ring p)]
     (map-coefficients #(a/negate R %) p)))
 
-(defn coef
-  [^Polynomial p xs]
-  (if-let [s (seq (drop-while #(not= xs (first %)) (.terms p)))]
-    (second (first s))
-    (a/additive-identity (.ring p))))
-
 (defn basis
   [ring arity]
   (cons (->Polynomial ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity ring)]])
@@ -205,7 +205,7 @@
                     (< o 0) (recur (rest ps) qs (conj s [pxs pc]))
                     :else (recur ps (rest qs) (conj s [qxs qc])))))))
 
-(defn add
+(defn ^:private add
   "Adds the polynomials p and q"
   [^Polynomial p ^Polynomial q]
   {:pre [(instance? Polynomial p)
@@ -215,19 +215,19 @@
     (->Polynomial R (.arity p)
                   (merge-term-lists (.terms p) (.terms q) a/add R))))
 
-(defn sub
+(defn ^:private sub
   "Adds the polynomials p and q"
   [p q]
   (add p (polynomial-negate q)))
 
-(defn scale
+(defn ^:private scale
   "Scalar multiply p by c, where c is in the same ring as the coefficients of p"
-  [^Polynomial p c]
+  [c ^Polynomial p]
   {:pre [(instance? Polynomial p)
          (a/member? (.ring p) c)]}
   (map-coefficients #(a/mul (.ring p) % c) p))
 
-(defn mul
+(defn ^:private mul
   "Multiply polynomials p and q, and return the product."
   [^Polynomial p ^Polynomial q]
   {:pre [(instance? Polynomial p)
@@ -242,7 +242,7 @@
                        [xq cq] (.terms q)]
                    [(mapv + xp xq) (a/mul R cp cq)])))))
 
-(defn polynomial-order
+(defn ^:private polynomial-order
   [^Polynomial p ^Polynomial q]
   {:pre [(instance? Polynomial p)
          (instance? Polynomial q)
@@ -260,7 +260,7 @@
                         (if (not= k 0) k (recur (next pterms) (next qterms))))
                       mo))))))
 
-(defn divide
+(defn ^:private divide
   "Divide polynomial u by v, and return the pair of [quotient, remainder]
   polynomials. This assumes that the coefficients are drawn from a field,
   and so support division."
@@ -268,8 +268,8 @@
   {:pre [(instance? Polynomial u)
          (instance? Polynomial v)]}
   (cond (polynomial-zero? v) (throw (IllegalArgumentException. "internal polynomial division by zero"))
-        (polynomial-zero? u) [(polynomial-zero-like u) u]
-        (polynomial-one? v) [u (polynomial-zero-like u)]
+        (polynomial-zero? u) [u u]
+        (polynomial-one? v) [u (->Polynomial (.ring u) (.arity u) empty-coefficients)]
         :else (let [ctor (compatible-constructor u v)
                     R (.ring u)
                     [vn-exponents vn-coefficient] (lead-term v)
@@ -289,46 +289,40 @@
                                (sub remainder (mul new-term v))))
                       [quotient remainder]))))))
 
+(defprotocol IPolynomialConstructor
+  (make-unary [this dense-coefficients]))
+
+(defmacro ^:private reify-polynomial-ring
+  [coefficient-ring arity euclidean?]
+  `(reify
+     a/Ring
+     (member? [_ p#] (instance? Polynomial p#))
+     (additive-identity [_] (->Polynomial ~coefficient-ring ~arity []))
+     (additive-identity? [_ p#] (polynomial-zero? p#))
+     (multiplicative-identity [_]
+       (->Polynomial ~coefficient-ring ~arity
+                     [[(vec (repeat ~arity 0)) (a/multiplicative-identity ~coefficient-ring)]]))
+     (multiplicative-identity? [_ p#] (polynomial-one? p#))
+     (add [_ p# q#] (add p# q#))
+     (subtract [_ p# q#] (sub p# q#))
+     (negate [_ p#] (polynomial-negate p#))
+     (mul [_ p# q#] (mul p# q#))
+     ~@(if euclidean?
+         `(a/Euclidean
+           (quorem [_ p# q#] (divide p# q#))))
+     a/Ordered
+     (cmp [_ p# q#] (polynomial-order p# q#))
+     a/Module
+     (scale [_ r# p#] (scale r# p#))
+     IPolynomialConstructor
+     (make-unary [_ dense-coefficients#]
+       (make ~coefficient-ring 1 (map #(vector [%1] %2) (range) dense-coefficients#)))
+     Object
+     (toString [_] (format "%s[%dv]" ~coefficient-ring ~arity))))
+
 (defn PolynomialRing
   [coefficient-ring arity]
-  (if (= arity 1)
-    (reify
-      a/Ring
-      (member? [this p] (instance? Polynomial p))
-      (additive-identity [this] (->Polynomial coefficient-ring arity []))
-      (additive-identity? [this p] (polynomial-zero? p))
-      (multiplicative-identity [this] (->Polynomial coefficient-ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity coefficient-ring)]]))
-      (multiplicative-identity? [this p] (polynomial-one? p))
-      (add [this p q] (add p q))
-      (subtract [this p q] (sub p q))
-      (negate [this p] (polynomial-negate p))
-      (mul [this p q] (mul p q))
-      a/Euclidean
-      (quorem [this p q] (divide p q))
-      a/Ordered
-      (cmp [this p q] (polynomial-order p q))
-      a/Module
-      (scale [this p r] (scale p r))
-      Object
-      (toString [this] (format "%s[%dv]" coefficient-ring arity)))
-    ;; arity ≠ 1, so we don't support the Euclidean interface
-    (reify
-      a/Ring
-      (member? [this p] (instance? Polynomial p))
-      (additive-identity [this] (->Polynomial coefficient-ring arity []))
-      (additive-identity? [this p] (polynomial-zero? p))
-      (multiplicative-identity [this] (->Polynomial coefficient-ring arity [[(vec (repeat arity 0)) (a/multiplicative-identity coefficient-ring)]]))
-      (multiplicative-identity? [this p] (polynomial-one? p))
-      (add [this p q] (add p q))
-      (subtract [this p q] (sub p q))
-      (negate [this p] (polynomial-negate p))
-      (mul [this p q] (mul p q))
-      a/Ordered
-      (cmp [this p q] (polynomial-order p q))
-      a/Module
-      (scale [this p r] (scale p r))
-      Object
-      (toString [this] (format "%s[%dv]" coefficient-ring arity)))))
+  (reify-polynomial-ring coefficient-ring arity (= arity 1)))
 
 (defn zippel-pseudo-remainder
   "The algorithm PolyPseudoRemainder from Zippel, p.132"
@@ -344,14 +338,14 @@
                 lcv (coefficient (lead-term v))
                 lcw (coefficient (lead-term w))
                 w' (sub
-                    (scale w lcv)
+                    (scale lcv w)
                     (mul v (->Polynomial R 1 [[[k] lcw]])))
                 k' (- (degree w') (degree v))]
             (cond (polynomial-zero? w') w'
-                  (< (degree w') deg-v) (scale w' (a/exponentiation-by-squaring R lcv k))
+                  (< (degree w') deg-v) (scale (a/exponentiation-by-squaring R lcv k) w')
                   (> k (inc δ)) (let [e (- k (inc δ))
                                       lcv**e (a/exponentiation-by-squaring R lcv e)]
-                                  (recur (scale w' lcv**e)))
+                                  (recur (scale lcv**e w')))
                   :else (recur w')))))))
 
 (defn classic-pseudo-remainder
@@ -368,12 +362,9 @@
         lcv (coefficient (lead-term v))
         e (- (inc deg-u) deg-v)
         lcv**e (a/exponentiation-by-squaring R lcv e)]
-    (-> u
-        (scale lcv**e)
-        (divide v)
-        second)))
+    (second (divide (scale lcv**e u) v))))
 
-(defn univariate-content
+(defn ^:private univariate-content
   [^Polynomial p]
   {:pre [(= (.arity p) 1)]}
   (if (polynomial-zero? p) p
@@ -432,50 +423,12 @@
     (if (polynomial-zero? v) (list u)
         (lazy-seq (cons u (step v (remainder u v)))))))
 
-(defn evenly-divide
-  "Divides the polynomial u by the polynomial v. Throws an IllegalStateException
-  if the division leaves a remainder. Otherwise returns the quotient."
-  [u v]
-  {:pre [(instance? Polynomial u)
-         (instance? Polynomial v)]}
-  (let [[q r] (divide u v)]
-    (when-not (polynomial-zero? r)
-      (throw (IllegalStateException. (str "expected even division left a remainder!" u " / " v " r " r))))
-    q))
-
-(defn abs
+(defn ^:private abs
   [^Polynomial p]
   (let [R (.ring p)]
     (if (a/cmp R p (a/additive-identity R))
       (polynomial-negate p)
       p)))
-
-(defn expt
-  "Raise the polynomial p to the (integer) power n. Note: Zippel suggests
-  this algorithm may not be a win for polynomials. Research that."
-  [^Polynomial p n]
-  (when-not (and (integer? n) (>= n 0))
-    (throw (ArithmeticException.
-            (str "can't raise poly to " n))))
-  (cond (polynomial-one? p) p
-        (polynomial-zero? p) (if (zero? n)
-                               (throw (ArithmeticException. "poly 0^0"))
-                               p)
-        (zero? n) (polynomial-one-like p)
-        :else (loop [x p c n a (polynomial-one-like p)]
-                (if (zero? c) a
-                    (if (even? c)
-                      (recur (mul x x) (quot c 2) a)
-                      (recur x (dec c) (mul x a)))))))
-
-(defn evaluate
-  [^Polynomial p xs]
-  (assert (= (.arity p) (count xs)))
-  (let [R (.ring p)
-        mul #(a/mul R %1 %2)
-        add #(a/add R %1 %2)]
-    (reduce add (a/additive-identity R) (for [[es c] (.terms p)]
-                                          (reduce mul c (map #(a/exponentiation-by-squaring R %1 %2) xs es))))))
 
 (defn partial-derivative
   "The partial derivative of the polynomial with respect to the
@@ -495,16 +448,3 @@
   [^Polynomial p]
   (for [i (range (.arity p))]
     (partial-derivative p i)))
-
-(defn zippel-algorithm-D
-  [ps ms]
-  {:pre [(= (count ps) (count ms))]}
-  (loop [f (make [(first ms)])
-         q (make [(- (first ps)) 1])
-         [m & ms] (rest ms)
-         [p & ps] (rest ps)]
-    (if (nil? m) f
-        (recur (add f (map-coefficients #(/ (* % (- m (evaluate f [p]))) (evaluate q [p])) q))
-               (mul q (make [(- p) 1]))
-               ms
-               ps))))
