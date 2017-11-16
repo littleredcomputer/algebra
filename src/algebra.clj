@@ -55,7 +55,7 @@
     :else (loop [x x
                  y (multiplicative-identity R)
                  n e]
-            (cond (<= n 1) (mul R x y)
+            (cond (= n 1) (mul R x y)
                   (even? n) (recur (mul R x x) y (bit-shift-right n 1))
                   :else (recur (mul R x x) (mul R x y) (bit-shift-right (dec n) 1))))))
 
@@ -75,10 +75,25 @@
 
 (defn euclid-gcd
   [R u v]
-  (let [step (fn [u v]
-               (if (additive-identity? R v) u
-                   (recur v (second (quorem R u v)))))]
-    (step u v)))
+  (loop [u u v v]
+    (if (additive-identity? R v) u
+        (recur v (second (quorem R u v))))))
+
+(defn extended-euclid
+  [R u v]
+  (loop [rr u
+         sr (multiplicative-identity R)
+         tr (additive-identity R)
+         r v
+         s (additive-identity R)
+         t (multiplicative-identity R)]
+    (if (additive-identity? R r)
+      [rr sr tr]
+      (let [q (first (quorem R rr r))]
+        (recur r s t
+               (subtract R rr (mul R q r))
+               (subtract R sr (mul R q s))
+               (subtract R tr (mul R q t)))))))
 
 (defn euclid-gcd-seq
   [R as]
@@ -86,3 +101,17 @@
                 (let [g (euclid-gcd R a b)]
                   (if (multiplicative-identity? R g) (reduced g) g)))]
     (reduce gcd-1 as)))
+
+(defn chinese-remainder
+  [R vs ms]
+  (let [n (count vs)
+        M (reduce (partial mul R) ms)
+        Mm (mapv #(first (quorem R M %)) ms)]
+    (reduce (partial add R)
+            (map (partial mul R)
+                 Mm
+                 (for [i (range n)]
+                   (let [mi (nth ms i)
+                         Mmi (nth Mm i)
+                         [g s t] (extended-euclid R Mmi mi)]
+                     (second (quorem R (mul R (nth vs i) s) mi))))))))
