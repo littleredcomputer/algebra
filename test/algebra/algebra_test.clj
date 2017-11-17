@@ -13,7 +13,10 @@
     (is (= 8 (a/exponentiation-by-squaring R 2 3)))
     (is (= 2 (a/euclid-gcd R 8 6)))
     (is (= 2 (a/euclid-gcd-seq R [8 6])))
-    (is (= 8 (a/euclid-gcd-seq R [8])))))
+    (is (= 8 (a/euclid-gcd-seq R [8])))
+    (is (= [7 2 -7] (a/extended-euclid R 126 35)))
+    (is (= 37 (a/chinese-remainder R [1 1 2] [2 3 5])))
+    (is (= 63 (a/chinese-remainder R [0 11] [3 26])))))
 
 (defspec gcd
   (let [R a/NativeArithmetic]

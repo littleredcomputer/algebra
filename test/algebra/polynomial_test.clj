@@ -229,7 +229,13 @@
           monomial-sort #(sort-by identity % monomials)]
       (is (= [z2 xy2z x2z2 x3] (monomial-sort lex-order)))
       (is (= [z2 x3 x2z2 xy2z] (monomial-sort graded-reverse-lex-order)))
-      (is (= [z2 x3 xy2z x2z2] (monomial-sort graded-lex-order))))))
+      (is (= [z2 x3 xy2z x2z2] (monomial-sort graded-lex-order)))))
+
+  (testing "field gcd"
+    (is (= [(P -3/2 9/2)
+            (P 1)
+            (P -9/4 3/2)]
+           (a/extended-euclid Rx (P -6 30 -42 18) (P -2 10 -12))))))
 
 (deftest poly-partial-derivatives
   (let [V (P 1 2 3 4)
