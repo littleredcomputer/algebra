@@ -6,7 +6,7 @@
 
 (defn solve
   "SolveVandermonde (p. 212 in Zippel: Effective Polynomial Computation)"
-  [R ks ws]
+  [R ks ws & {:keys [transposed]}]
   (assert (= (count ks) (count ws)))
   (assert (> (count ks) 0))
   (let [Rx (p/PolynomialRing R 1)
@@ -16,13 +16,9 @@
         kbs (map ->binomial ks)
         Q (reduce (partial a/mul Rx) kbs)
         Qi (map #(first (a/quorem Rx Q %)) kbs)
-        Pi (mapv #(a/scale Rx (a/reciprocal R (p/evaluate %1 [%2])) %1) Qi ks)]
-    (loop [i 0
-           x (vec (repeat n (a/additive-identity R)))]
-      (if (= i n)
-        x
-        (recur (inc i)
-               (map-indexed
-                (fn [j xj]
-                  (a/add R xj (a/mul R (nth ws i) (p/coef (nth Pi i) [j]))))
-                x))))))
+        Pi (mapv #(a/scale Rx (a/reciprocal R (p/evaluate %1 [%2])) %1) Qi ks)
+        c #(p/coef (nth Pi %1) [%2])]
+    (mapv
+     (fn [i]
+       (reduce (partial a/add R) (for [j (range n)] (a/mul R (nth ws j) (if transposed (c i j) (c j i))))))
+     (range n))))

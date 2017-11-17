@@ -262,20 +262,30 @@
                       [quotient remainder]))))))
 
 (defprotocol IPolynomialConstructor
-  (basis [this])
-  (make-unary [this dense-coefficients])
-  (make [this xc-pairs]))
+  (basis [this]
+    "Produces the constant unit polynomial polynomial in the base ring
+     followed by one linear polynomial with unit linear coefficient
+     and zero constant term for each indeterminate.")
+  (make-unary [this dense-coefficients]
+    "In the unary case, makes a polynomial with a dense coefficient
+    list (beginning with the constant term and proceeding with each
+    sequential exponent)")
+  (make [this xc-pairs]
+    "Makes a polynomial given a (sparse) list of `[exponent-vector
+    coefficient]` pairs"))
 
 (defmacro ^:private reify-polynomial-ring
-  [coefficient-ring arity & {:keys [euclidean]}]
+  "A macro is used because we want to optionally configure a protocol
+  in the reified object, and reify itself is a macro."
+  [R arity & {:keys [euclidean]}]
   `(reify
      a/Ring
      (member? [_ p#] (instance? Polynomial p#))
-     (additive-identity [_] (->Polynomial ~coefficient-ring ~arity []))
+     (additive-identity [_] (->Polynomial ~R ~arity []))
      (additive-identity? [_ p#] (polynomial-zero? p#))
      (multiplicative-identity [_]
-       (->Polynomial ~coefficient-ring ~arity
-                     [[(vec (repeat ~arity 0)) (a/multiplicative-identity ~coefficient-ring)]]))
+       (->Polynomial ~R ~arity
+                     [[(vec (repeat ~arity 0)) (a/multiplicative-identity ~R)]]))
      (multiplicative-identity? [_ p#] (polynomial-one? p#))
      (add [_ p# q#] (add p# q#))
      (subtract [_ p# q#] (sub p# q#))
@@ -289,12 +299,13 @@
      a/Module
      (scale [_ r# p#] (scale r# p#))
      IPolynomialConstructor
-     (basis [_] (polynomial-basis ~coefficient-ring ~arity))
+     (basis [_] (polynomial-basis ~R ~arity))
      (make-unary [_ dense-coefficients#]
-       (make-polynomial ~coefficient-ring 1 (map #(vector [%1] %2) (range) dense-coefficients#)))
-     (make [_ xc-pairs#] (make-polynomial ~coefficient-ring ~arity xc-pairs#))
+       (assert (= ~arity 1))
+       (make-polynomial ~R 1 (map #(vector [%1] %2) (range) dense-coefficients#)))
+     (make [_ xc-pairs#] (make-polynomial ~R ~arity xc-pairs#))
      Object
-     (toString [_] (format "%s[%dv]" ~coefficient-ring ~arity))))
+     (toString [_] (format "%s[%dv]" ~R ~arity))))
 
 (defn PolynomialRing
   [coefficient-ring arity]

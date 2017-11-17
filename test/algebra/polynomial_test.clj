@@ -189,14 +189,17 @@
       (is (= [(P -8 28 -22 -31 60 -21 -22 23 -8 1)
               (P -8 -4 26 9 -32 -5 18 -1 -4 1)
               (P 0 -32 48 40 -92 16 40 -24 4)
-              (P -128 192 160 -368 64 160 -96 16)
-              ]
+              (P -128 192 160 -368 64 160 -96 16)]
              (let [xm1 (P -1 1)
                    xm2 (P -2 1)
                    xp1 (P 1 1)]
                (subresultant-polynomial-remainder-sequence
-                (a/mul Rx (a/mul Rx (a/exponentiation-by-squaring Rx xm1 4) (a/exponentiation-by-squaring Rx xm2 3)) (a/exponentiation-by-squaring Rx xp1 2))
-                (a/mul Rx (a/mul Rx (a/exponentiation-by-squaring Rx xm1 2) (a/exponentiation-by-squaring Rx xm2 3)) (a/exponentiation-by-squaring Rx xp1 4))))))
+                (a/mul Rx (a/mul Rx (a/exponentiation-by-squaring Rx xm1 4)
+                                 (a/exponentiation-by-squaring Rx xm2 3))
+                       (a/exponentiation-by-squaring Rx xp1 2))
+                (a/mul Rx (a/mul Rx (a/exponentiation-by-squaring Rx xm1 2)
+                                 (a/exponentiation-by-squaring Rx xm2 3))
+                       (a/exponentiation-by-squaring Rx xp1 4))))))
       (is (= [(P 0 0 -2) (P 0 -1)]
              (subresultant-polynomial-remainder-sequence (P 0 0 -2) (P 0 -1))))
       (is (= [(P 1) (P 1)]
