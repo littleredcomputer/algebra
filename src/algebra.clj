@@ -25,6 +25,18 @@
 (defprotocol Module
   (scale [this r x]))
 
+(defrecord Zmod [n]
+  Ring
+  (member? [this x] (number? x))
+  (additive-identity [this] 0)
+  (additive-identity? [this x] (zero? (mod x n)))
+  (multiplicative-identity [this] 1)
+  (multiplicative-identity? [this x] (= (mod x n) 1))
+  (add [this x y] (mod (+' x y) n))
+  (subtract [this x y] (mod (-' x y) n))
+  (negate [this x] (mod (-' x) n))
+  (mul [this x y] (mod (*' x y) n)))
+
 (def NativeArithmetic
   "The 'ring' of Clojure's native arithmetic (overflow-safe) operators."
   (reify
@@ -112,6 +124,5 @@
                  Mm
                  (for [i (range n)]
                    (let [mi (nth ms i)
-                         Mmi (nth Mm i)
-                         [g s t] (extended-euclid R Mmi mi)]
+                         [g s t] (extended-euclid R (nth Mm i) mi)]
                      (second (quorem R (mul R (nth vs i) s) mi))))))))

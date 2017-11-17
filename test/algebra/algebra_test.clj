@@ -26,6 +26,19 @@
                     (and (a/evenly-divides? R g u)
                          (a/evenly-divides? R g v))))))
 
+(defspec extended-euclid
+  (let [R a/NativeArithmetic]
+    (prop/for-all [u gen/int
+                   v gen/int]
+                  (let [[g s t] (a/extended-euclid R u v)]
+                    (and (or (a/additive-identity? R g)
+                             (and (a/evenly-divides? R g u)
+                                  (a/evenly-divides? R g v)))
+                         (or (a/additive-identity? R u)
+                             (a/additive-identity? R v)
+                             (not (a/additive-identity? R g)))
+                         (= g (a/add R (a/mul R s u) (a/mul R t v))))))))
+
 (defspec expt
   (let [R a/NativeArithmetic]
     (prop/for-all [u gen/int

@@ -104,19 +104,7 @@
       (is (= (P 1 4 6 4 1) (a/exponentiation-by-squaring Rx x+1 4)))
       (is (= (P 1 5 10 10 5 1) (a/exponentiation-by-squaring Rx x+1 5)))))
   (testing "GF(2)"
-    (let [Zmod (fn [n]
-                (reify
-                  Ring
-                  (member? [this x] (integer? x))
-                  (additive-identity [this] 0)
-                  (additive-identity? [this x] (= x 0))
-                  (multiplicative-identity [this] 1)
-                  (multiplicative-identity? [this x] (= x 1))
-                  (add [this x y] (mod (+ x y) n))
-                  (subtract [this x y] (mod (- x y) n))
-                  (negate [this x] (mod (- x) n))
-                  (mul [this x y] (mod (* x y) n))))
-          Z2 (Zmod 2)
+    (let [Z2 (a/->Zmod 2)
           Z2x (PolynomialRing Z2 1)
           P (make-unary Z2x [1 0 1])]
       (is (= (make Z2x [[[4] 1] [[0] 1]]) (a/exponentiation-by-squaring Rx P 2)))
@@ -158,6 +146,7 @@
                               (a/exponentiation-by-squaring Z2x x 5)
                               (a/exponentiation-by-squaring Z2x x 7)]) r1))
           (is (= (reduce p+p (map #(a/exponentiation-by-squaring Z2x x %) [0 4 5 6 9 11 12])) r2))))))
+
   (testing "pseudo remainder sequences"
     (let [F1 (P -5 2 8 -3 -3 0 1 0 1)
           F2 (P 21 -9 -4 0 5 0 3)]
@@ -235,7 +224,12 @@
     (is (= [(P -3/2 9/2)
             (P 1)
             (P -9/4 3/2)]
-           (a/extended-euclid Rx (P -6 30 -42 18) (P -2 10 -12))))))
+           (a/extended-euclid Rx (P -6 30 -42 18) (P -2 10 -12))))
+    ;; XXX: need to implement the monic-remainder calculation in extended GCD to get this right.
+    (is (= (P 14999180998204546086628509444183593910034968673275/141919206653976666794661960809129382074315418338)
+           (first (a/extended-euclid Rx (P -764 -979 -741 -814 -65 824) (P 617 916 880 663 216)))))
+    #_(is (= [] (a/extended-euclid Rx (P 2) (P 1 0))))
+    ))
 
 (deftest poly-partial-derivatives
   (let [V (P 1 2 3 4)
@@ -338,6 +332,17 @@
            (a/evenly-divides? Rx g v)
            (a/evenly-divides? Rx k g)))))
 
+(defspec extended-euclid-over-polynomials 25
+  (prop/for-all [p (generate-poly 1)
+                 q (generate-poly 1)]
+                (let [[g s t] (a/extended-euclid Rx p q)]
+                  (and (or (a/additive-identity? Rx g)
+                           (and (a/evenly-divides? Rx g p)
+                                (a/evenly-divides? Rx g q)))
+                       (or (a/additive-identity? Rx p)
+                           (a/additive-identity? Rx q)
+                           (not (a/additive-identity? Rx g)))
+                       (= g (a/add Rx (a/mul Rx s p) (a/mul Rx t q)))))))
 
 (defspec test-univariate-subresultant-gcd
   (prop/for-all [test-case univariate-polynomial-gcd-test-case-generator]
