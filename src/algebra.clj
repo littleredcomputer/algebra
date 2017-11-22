@@ -35,7 +35,9 @@
   (add [this x y] (mod (+' x y) n))
   (subtract [this x y] (mod (-' x y) n))
   (negate [this x] (mod (-' x) n))
-  (mul [this x y] (mod (*' x y) n)))
+  (mul [this x y] (mod (*' x y) n))
+  Euclidean
+  (quorem [this x y] [(mod (quot x y) n) (mod (rem x y) n)]))
 
 (def NativeArithmetic
   "The 'ring' of Clojure's native arithmetic (overflow-safe) operators."

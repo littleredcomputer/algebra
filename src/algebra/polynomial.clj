@@ -6,8 +6,6 @@
             [clojure.set :as set]
             [clojure.string :as string]))
 
-(declare operator-table operators-known make-constant)
-
 (def coefficient second)
 (def exponents first)
 
@@ -63,7 +61,8 @@
 (defprotocol IPolynomial
   (degree [this])
   (coef [this exponents])
-  (evaluate [this args]))
+  (evaluate [this args])
+  (fmap [this S f]))
 
 (defrecord Polynomial [ring arity terms]
   IPolynomial
@@ -77,7 +76,13 @@
   (evaluate [_ args]
     (reduce (partial a/add ring) (a/additive-identity ring)
             (for [[es c] terms]
-              (reduce (partial a/mul ring) c (map #(a/exponentiation-by-squaring ring %1 %2) args es))))))
+              (reduce (partial a/mul ring) c (map #(a/exponentiation-by-squaring ring %1 %2) args es)))))
+  (fmap [_ S f]
+    (->Polynomial S arity (into empty-coefficients
+                                (for [[xs c] terms
+                                      :let [fc (f c)]
+                                      :when (not (a/additive-identity? S fc))]
+                                  [xs fc])))))
 
 (defn ^:private polynomial-zero? [^Polynomial p] (empty? (.terms p)))
 (defn ^:private polynomial-one?
@@ -90,7 +95,7 @@
         (and (every? zero? xs)
              (a/multiplicative-identity? R c))))))
 
-(defn ^:private make-polynomial
+(defn ^:private polynomial-make
   "Constructs a polynomial with coefficients in `ring` with the given
   `arity` (number of indeterminates), followed by a sequence
   of exponent-coefficient pairs. Each exponent should be a vector with
@@ -127,22 +132,12 @@
   [^Polynomial p ^Polynomial q]
   (assert (and (= (.arity p) (.arity q))
                (= (.ring p) (.ring q))))
-  (fn [xs->c] (make-polynomial (.ring p) (.arity p) xs->c)))
-
-(defn ^:private map-coefficients
-  "Map the function f over the coefficients of p, returning a new Polynomial."
-  [f ^Polynomial p]
-  (let [R (.ring p)]
-    (->Polynomial R (.arity p) (into empty-coefficients
-                                     (for [[xs c] (.terms p)
-                                           :let [fc (f c)]
-                                           :when (not (a/additive-identity? R fc))]
-                                       [xs fc])))))
+  (fn [xs->c] (polynomial-make (.ring p) (.arity p) xs->c)))
 
 (defn ^:private polynomial-negate
   [^Polynomial p]
   (let [R (.ring p)]
-    (map-coefficients #(a/negate R %) p)))
+    (fmap p R #(a/negate R %))))
 
 (defn ^:private polynomial-basis
   [ring arity]
@@ -197,7 +192,8 @@
   [c ^Polynomial p]
   {:pre [(instance? Polynomial p)
          (a/member? (.ring p) c)]}
-  (map-coefficients #(a/mul (.ring p) % c) p))
+  (let [R (.ring p)]
+    (fmap p R #(a/mul R % c))))
 
 (defn ^:private mul
   "Multiply polynomials p and q, and return the product."
@@ -291,6 +287,8 @@
      (subtract [_ p# q#] (sub p# q#))
      (negate [_ p#] (polynomial-negate p#))
      (mul [_ p# q#] (mul p# q#))
+     ;; the problem is that the right implementation of quorem
+     ;; depends on the base ring?
      ~@(if euclidean
          `(a/Euclidean
            (quorem [_ p# q#] (divide p# q#))))
@@ -302,8 +300,8 @@
      (basis [_] (polynomial-basis ~R ~arity))
      (make-unary [_ dense-coefficients#]
        (assert (= ~arity 1))
-       (make-polynomial ~R 1 (map #(vector [%1] %2) (range) dense-coefficients#)))
-     (make [_ xc-pairs#] (make-polynomial ~R ~arity xc-pairs#))
+       (polynomial-make ~R 1 (map #(vector [%1] %2) (range) dense-coefficients#)))
+     (make [_ xc-pairs#] (polynomial-make ~R ~arity xc-pairs#))
      Object
      (toString [_] (format "%s[%dv]" ~R ~arity))))
 
@@ -364,7 +362,7 @@
   {:pre [(= (.arity p) 1)]}
   (let [R (.ring p)
         g (univariate-content p)]
-    (map-coefficients #(a/exact-quotient R % g) p)))
+    (fmap p R #(a/exact-quotient R % g))))
 
 (defn subresultant-polynomial-remainder-sequence
   [^Polynomial u ^Polynomial v]
@@ -375,10 +373,10 @@
         δ0 (- (degree u) (degree v))
         ψ0 (if (even? δ0) minus-one one)]
     (defn step [prr pr δr ψ β]
-      (let [p (map-coefficients #(a/exact-quotient R % β) (classic-pseudo-remainder prr pr))
+      (let [p (fmap (classic-pseudo-remainder prr pr) R #(a/exact-quotient R % β) )
             a (coefficient (lead-term pr))
             ψ (if (zero? δr)
-                ψ ; Avoid negative exponent
+                ψ                       ; Avoid negative exponent
                 (a/exact-quotient R (a/exponentiation-by-squaring R a δr)
                                   (a/exponentiation-by-squaring R ψ (dec δr))))
             δ (- (degree pr) (degree p))
@@ -424,7 +422,7 @@
   i-th indeterminate."
   [^Polynomial p i]
   (let [R (.ring p)]
-    (make-polynomial (.ring p)
+    (polynomial-make (.ring p)
                      (.arity p)
                      (for [[xs c] (.terms p)
                            :let [xi (xs i)]
@@ -437,3 +435,58 @@
   [^Polynomial p]
   (for [i (range (.arity p))]
     (partial-derivative p i)))
+
+(def ^:private log2e (/ (Math/log 2)))
+(defn ^:private log2 [x] (* (Math/log x) log2e))
+
+(def ^:private small-odd-primes [
+ 2 3 5 7 11 13 17 19 23 29
+ 31 37 41 43 47 53 59 61 67 71
+ 73 79 83 89 97 101 103 107 109 113
+ 127 131 137 139 149 151 157 163 167 173
+ 179 181 191 193 197 199 211 223 227 229
+ 233 239 241 251 257 263 269 271 277 281
+ 283 293 307 311 313 317 331 337 347 349
+ 353 359 367 373 379 383 389 397 401 409
+ 419 421 431 433 439 443 449 457 461 463
+ 467 479 487 491 499 503 509 521 523 541
+ 547 557 563 569 571 577 587 593 599 601
+ 607 613 617 619 631 641 643 647 653 659
+ 661 673 677 683 691 701 709 719 727 733
+ 739 743 751 757 761 769 773 787 797 809
+ 811 821 823 827 829 839 853 857 859 863
+ 877 881 883 887 907 911 919 929 937 941
+ 947 953 967 971 977 983 991 997 ])
+
+(defn small-primes-modular-univariate-gcd
+  "[GG13] Algorithm 6.38"
+  [u v]
+  (let [R (compatible-ring u v)
+        u (univariate-primitive-part u)
+        v (univariate-primitive-part v)
+        n (degree u) ;; XXX: alg. wants deg f >= deg g >= 1
+        A (reduce max (map coefficient (concat (:terms u) (:terms v))))
+        b (a/euclid-gcd R (coefficient (lead-term u)) (coefficient (lead-term v)))
+        k (Math/ceil (+ (* n (log2 (inc n)))
+                        (log2 b)
+                        (* 2 n (log2 A))))
+        B (* (Math/sqrt (inc n))
+             (Math/pow 2 n)
+             A b)
+        l (Math/ceil (log2 (inc (* 2 B))))
+        L (* 2 k (Math/log k))
+        ;; step 3: choose a set S of 2l primes, each less than 2k ln k
+        ;; The first part of step 4 drops all primes that divide b from
+        ;; S. We coalesce these operations into one step.
+        ps (take (* 2 l) (filter #(not= 0 (mod b %)) small-odd-primes))
+        prime-rings (map a/->Zmod ps)
+        ubars (map #(fmap u % (fn [c] (mod c (:n %)))) prime-rings)
+        vbars (map #(fmap v % (fn [c] (mod c (:n %)))) prime-rings)
+        gs (map univariate-euclid-gcd ubars vbars)]
+    [A b k B l L]
+    (println "u" u)
+    (println "v" v)
+    (println "ps" ps)
+    (println "ubars" ubars)
+    (println "vbars" vbars)
+    (println "gs" gs)))

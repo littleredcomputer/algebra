@@ -304,7 +304,7 @@
                   (= (a/mul Rx p (a/add Rx q r)) (a/add Rx (a/mul Rx p q) (a/mul Rx p r))))))
 
 
-(defn ^:private make-polynomial-from-ints
+(defn ^:private polynomial-make-from-ints
   "Given integers i0, i1, ... returns the polynomial (x+i0)(x+i1)..."
   [is]
   (reduce #(a/mul Rx %1 %2) (P 1) (map #(P % 1) is)))
@@ -326,7 +326,7 @@
 (defn ^:private test-univariate-polynomial-gcd-with
   [gcd-er]
   (fn [test-case]
-    (let [[u v k] (map make-polynomial-from-ints test-case)
+    (let [[u v k] (map polynomial-make-from-ints test-case)
           g (gcd-er u v)]
       (and (a/evenly-divides? Rx g u)
            (a/evenly-divides? Rx g v)
@@ -351,6 +351,13 @@
 (defspec test-univariate-euclid-gcd
   (prop/for-all [test-case univariate-polynomial-gcd-test-case-generator]
                 ((test-univariate-polynomial-gcd-with univariate-euclid-gcd) test-case)))
+
+(defspec spmod 25
+  (prop/for-all [p (generate-nonzero-poly 1)
+                 q (generate-nonzero-poly 1)]
+                (do
+                  (small-primes-modular-univariate-gcd p q)
+                  true)))
 
 (defn -main
   [& args]
