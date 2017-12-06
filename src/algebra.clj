@@ -39,11 +39,11 @@
   Euclidean
   (quorem [this x y] [(mod (quot x y) n) (mod (rem x y) n)]))
 
-(def NativeArithmetic
-  "The 'ring' of Clojure's native arithmetic (overflow-safe) operators."
+(def Z
+  "The ring of Clojure's native (big) integer arithmetic."
   (reify
     Ring
-    (member? [this x] (number? x))
+    (member? [this x] (integer? x))
     (additive-identity [this] 0)
     (additive-identity? [this x] (zero? x))
     (multiplicative-identity [this] 1)
@@ -54,12 +54,31 @@
     (mul [this x y] (*' x y))
     Euclidean
     (quorem [this x y] [(quot x y) (rem x y)])
+    ;; possibly put "degree" in here, to represent the decreasing degrees of a remainder sequence
+    Ordered
+    (cmp [this x y] (compare x y))
+    Object
+    (toString [this] "ℕ")))
+
+(def Q
+  "The ring of Clojure's native rational arithmetic."
+  (reify
+    Ring
+    (member? [this x] (or (integer? x) (ratio? x)))
+    (additive-identity [this] 0)
+    (additive-identity? [this x] (zero? x))
+    (multiplicative-identity [this] 1)
+    (multiplicative-identity? [this x] (= x 1))
+    (add [this x y] (+' x y))
+    (subtract [this x y] (-' x y))
+    (negate [this x] (-' x))
+    (mul [this x y] (*' x y))
     Ordered
     (cmp [this x y] (compare x y))
     Field
     (divide [this x y] (/ x y))
     Object
-    (toString [this] "NativeArithmetic")))
+    (toString [this] "ℚ")))
 
 (defn exponentiation-by-squaring
   [R x e]

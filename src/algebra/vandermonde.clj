@@ -16,6 +16,9 @@
         kbs (map ->binomial ks)
         Q (reduce (partial a/mul Rx) kbs)
         Qi (map #(first (a/quorem Rx Q %)) kbs)
+        ;; If this is meant to work in Z, what operation would the
+        ;; polynomial need to support? A down-scale with exact-division,
+        ;; perhaps... is that a module operation? XXX
         Pi (mapv #(a/scale Rx (a/reciprocal R (p/evaluate %1 [%2])) %1) Qi ks)
         c #(p/coef (nth Pi %1) [%2])]
     (mapv

@@ -8,7 +8,7 @@
             [algebra :as a]))
 
 (deftest basics
-  (let [R a/NativeArithmetic]
+  (let [R a/Z]
     (is (= 9 (a/exponentiation-by-squaring R 3 2)))
     (is (= 8 (a/exponentiation-by-squaring R 2 3)))
     (is (= 2 (a/euclid-gcd R 8 6)))
@@ -19,7 +19,7 @@
     (is (= 63 (a/chinese-remainder R [0 11] [3 26])))))
 
 (defspec gcd
-  (let [R a/NativeArithmetic]
+  (let [R a/Z]
     (prop/for-all [u (gen/such-that (complement zero?) gen/nat)
                    v (gen/such-that (complement zero?) gen/int)]
                   (let [g (a/euclid-gcd R u v)]
@@ -27,7 +27,7 @@
                          (a/evenly-divides? R g v))))))
 
 (defspec extended-euclid
-  (let [R a/NativeArithmetic]
+  (let [R a/Z]
     (prop/for-all [u gen/int
                    v gen/int]
                   (let [[g s t] (a/extended-euclid R u v)]
@@ -40,14 +40,14 @@
                          (= g (a/add R (a/mul R s u) (a/mul R t v))))))))
 
 (defspec expt
-  (let [R a/NativeArithmetic]
+  (let [R a/Z]
     (prop/for-all [u gen/int
                    e gen/pos-int]
                   (is (= (a/exponentiation-by-squaring R u e)
                          (reduce #(a/mul R %1 %2) (a/multiplicative-identity R) (repeat e u)))))))
 
 (defspec nontrivial-gcd
-  (let [R a/NativeArithmetic]
+  (let [R a/Z]
     (prop/for-all [k (gen/such-that (complement zero?) gen/nat)
                    u (gen/such-that (complement zero?) gen/nat)
                    v (gen/such-that (complement zero?) gen/int)]
@@ -59,13 +59,13 @@
                          (a/evenly-divides? R k g))))))
 
 (defspec gcd-seq
-  (let [R a/NativeArithmetic]
+  (let [R a/Z]
     (prop/for-all [as (gen/not-empty (gen/vector (gen/such-that (complement zero?) gen/int)))]
                   (let [g (a/euclid-gcd-seq R as)]
                     (every? #(a/evenly-divides? R g %) as)))))
 
 (defspec nontrival-gcd-seq
-  (let [R a/NativeArithmetic]
+  (let [R a/Z]
     (prop/for-all [k-as (gen/let [k gen/s-pos-int
                                   as (gen/not-empty
                                       (gen/vector

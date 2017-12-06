@@ -270,6 +270,7 @@
     "Makes a polynomial given a (sparse) list of `[exponent-vector
     coefficient]` pairs"))
 
+
 (defmacro ^:private reify-polynomial-ring
   "A macro is used because we want to optionally configure a protocol
   in the reified object, and reify itself is a macro."
@@ -288,7 +289,9 @@
      (negate [_ p#] (polynomial-negate p#))
      (mul [_ p# q#] (mul p# q#))
      ;; the problem is that the right implementation of quorem
-     ;; depends on the base ring?
+     ;; depends on the base ring? Also, we note that Z[x] is not
+     ;; a Euclidean domain since we can't get a Bézout identity
+     ;; out of gcd(2,x) = 1 using coefficients in Z.
      ~@(if euclidean
          `(a/Euclidean
            (quorem [_ p# q#] (divide p# q#))))
@@ -335,8 +338,8 @@
                                   (recur (scale lcv**e w')))
                   :else (recur w')))))))
 
-(defn classic-pseudo-remainder
-  "The pseudo-remainder straight from the definition. Makes no attempt
+(defn ^:private pseudo-quotient
+  "The pseudo-quotient straight from the definition. Makes no attempt
   to control coefficient growth."
   [^Polynomial u ^Polynomial v]
   {:pre [(instance? Polynomial u)
@@ -349,7 +352,13 @@
         lcv (coefficient (lead-term v))
         e (- (inc deg-u) deg-v)
         lcv**e (a/exponentiation-by-squaring R lcv e)]
-    (second (divide (scale lcv**e u) v))))
+    (divide (scale lcv**e u) v)))
+
+(defn classic-pseudo-remainder
+  "The pseudo-remainder straight from the definition. Makes no attempt
+  to control coefficient growth."
+  [u v]
+  (second (pseudo-quotient u v)))
 
 (defn ^:private univariate-content
   [^Polynomial p]
