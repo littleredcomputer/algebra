@@ -58,7 +58,7 @@
     Ordered
     (cmp [this x y] (compare x y))
     Object
-    (toString [this] "ℕ")))
+    (toString [this] "ℤ")))
 
 (def Q
   "The ring of Clojure's native rational arithmetic."

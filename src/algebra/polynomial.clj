@@ -270,11 +270,13 @@
     "Makes a polynomial given a (sparse) list of `[exponent-vector
     coefficient]` pairs"))
 
+(defprotocol PseudoDivisible
+  (pseudo-divide [this u v]))
 
 (defmacro ^:private reify-polynomial-ring
   "A macro is used because we want to optionally configure a protocol
   in the reified object, and reify itself is a macro."
-  [R arity & {:keys [euclidean]}]
+  [R arity & {:keys [euclidean pseudo-divisible]}]
   `(reify
      a/Ring
      (member? [_ p#] (instance? Polynomial p#))
@@ -295,6 +297,9 @@
      ~@(if euclidean
          `(a/Euclidean
            (quorem [_ p# q#] (divide p# q#))))
+     ~@(if pseudo-divisible
+         `(PseudoDivisible
+           (pseudo-divide [_ p# q#] (zippel-pseudo-remainder p# q#))))
      a/Ordered
      (cmp [_ p# q#] (polynomial-order p# q#))
      a/Module
@@ -307,6 +312,9 @@
      (make [_ xc-pairs#] (polynomial-make ~R ~arity xc-pairs#))
      Object
      (toString [_] (format "%s[%dv]" ~R ~arity))))
+
+(def Zx
+  (reify-polynomial-ring a/Z 1 :pseudo-divisible true))
 
 (defn PolynomialRing
   [coefficient-ring arity]
@@ -321,16 +329,16 @@
   (let [R (compatible-ring u v)
         deg-u (degree u)
         deg-v (degree v)
+        lcv (coefficient (lead-term v))
         δ (- deg-u deg-v)]
     (if (< deg-u deg-v) u
         (loop [w u]
-          (let [k (- (degree w) (degree v))
-                lcv (coefficient (lead-term v))
+          (let [k (- (degree w) deg-v)
                 lcw (coefficient (lead-term w))
                 w' (sub
                     (scale lcv w)
                     (mul v (->Polynomial R 1 [[[k] lcw]])))
-                k' (- (degree w') (degree v))]
+                k' (- (degree w') deg-v)]
             (cond (polynomial-zero? w') w'
                   (< (degree w') deg-v) (scale (a/exponentiation-by-squaring R lcv k) w')
                   (> k (inc δ)) (let [e (- k (inc δ))
@@ -342,6 +350,8 @@
   "The pseudo-quotient straight from the definition. Makes no attempt
   to control coefficient growth."
   [^Polynomial u ^Polynomial v]
+  ;; annoying: divide wants field divide, so we may want to
+  ;; implement the "custom" pseudo-division here.
   {:pre [(instance? Polynomial u)
          (instance? Polynomial v)
          (not (polynomial-zero? v))
